@@ -1,0 +1,2069 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>组织架构图编辑器</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --bg: #f0f2f5;
+      --card-bg: #ffffff;
+      --primary: #2b5f8a;
+      --primary-dark: #1e4566;
+      --primary-light: #e8f0fe;
+      --text: #1a1a2e;
+      --text-secondary: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 4px 20px rgba(0,0,0,0.08);
+      --radius: 12px;
+      --node-blue: #2b5f8a;
+      --node-blue-light: #3a7bbf;
+      --node-green: #0d9488;
+      --node-purple: #7c3aed;
+      --node-orange: #ea580c;
+      --node-red: #dc2626;
+      --node-teal: #0891b2;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .toolbar .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+
+    .toolbar .logo svg { vertical-align: -3px; margin-right: 4px; }
+
+    .toolbar .divider {
+      width: 1px; height: 28px; background: var(--border); margin: 0 4px;
+    }
+
+    .btn {
+      padding: 7px 16px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+    .btn-primary:hover { background: var(--primary-dark); }
+
+    .btn-outline {
+      background: white;
+      border-color: var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover { background: var(--primary-light); border-color: var(--primary); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+    }
+    .btn-ghost:hover { background: #f1f5f9; color: var(--text); }
+
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-xs { padding: 3px 8px; font-size: 11px; }
+
+    .btn-icon { padding: 6px; border-radius: 6px; cursor: pointer; background: transparent; border: none; color: var(--text-secondary); display: flex; align-items: center; transition: 0.15s; }
+    .btn-icon:hover { background: #f1f5f9; color: var(--text); }
+
+    .zoom-control {
+      display: flex; align-items: center; gap: 4px;
+      margin-left: auto;
+    }
+    .zoom-control .zoom-val {
+      font-size: 12px; color: var(--text-secondary); min-width: 40px; text-align: center;
+    }
+
+    /* Canvas */
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      cursor: grab;
+      background: 
+        radial-gradient(circle, #e8edf3 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .canvas-container:active { cursor: grabbing; }
+    .canvas-container.dragging { cursor: grabbing; }
+
+    .canvas-scroll {
+      width: 100%; height: 100%;
+      overflow: auto;
+      scroll-behavior: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .canvas-inner {
+      position: relative;
+      padding: 60px;
+      transform-origin: 0 0;
+      transition: none;
+      min-width: max-content;
+    }
+
+    /* SVG Lines */
+    .lines-svg {
+      position: absolute;
+      top: 0; left: 0;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .lines-svg path {
+      fill: none;
+      stroke: #cbd5e1;
+      stroke-width: 2;
+      stroke-linecap: round;
+    }
+
+    /* Org Node */
+    .org-node {
+      position: absolute;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .org-node:hover { z-index: 10; }
+    .org-node:hover .node-card { box-shadow: 0 8px 30px rgba(0,0,0,0.15); transform: translateY(-2px); }
+    .org-node.selected .node-card { box-shadow: 0 0 0 3px var(--primary), 0 8px 30px rgba(0,0,0,0.15); }
+
+    .node-card {
+      background: var(--node-blue);
+      color: white;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      min-width: 160px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: 0.2s;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      min-height: 76px;
+    }
+    .node-card.root-node { background: var(--node-blue); }
+    .node-card.level-1 { background: var(--node-blue); }
+    .node-card.level-2 { background: var(--node-blue-light); }
+    .node-card.level-3 { background: #4a8fc9; }
+
+    .node-card.drag-over {
+      box-shadow: 0 0 0 3px #fbbf24, 0 8px 30px rgba(251,191,36,0.4) !important;
+      transform: scale(1.05) !important;
+    }
+
+    .node-name {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.3;
+      text-align: center;
+    }
+    .node-manager {
+      font-size: 11px;
+      opacity: 0.8;
+      margin-top: 4px;
+      text-align: center;
+    }
+    .node-count {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      background: #ef4444;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      min-width: 24px;
+      text-align: center;
+      box-shadow: 0 2px 6px rgba(239,68,68,0.3);
+    }
+
+    /* Action Buttons */
+    .node-actions {
+      position: absolute;
+      top: -36px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      gap: 4px;
+      background: white;
+      border-radius: 8px;
+      padding: 3px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      white-space: nowrap;
+    }
+    .org-node:hover .node-actions { display: flex; }
+    .org-node.selected .node-actions { display: flex; }
+
+    .node-action-btn {
+      width: 28px; height: 28px;
+      border: none; background: transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-secondary);
+      font-size: 14px;
+      transition: 0.15s;
+    }
+    .node-action-btn:hover { background: var(--primary-light); color: var(--primary); }
+    .node-action-btn.delete:hover { background: #fef2f2; color: var(--node-red); }
+
+    .add-child-btn {
+      position: absolute;
+      bottom: -32px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      padding: 5px 14px;
+      background: white;
+      border: 2px dashed var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      transition: 0.15s;
+    }
+    .org-node:hover .add-child-btn { display: flex; align-items: center; gap: 4px; }
+    .add-child-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.35);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      animation: fadeIn 0.15s;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    .modal {
+      background: white;
+      border-radius: 16px;
+      padding: 28px 32px;
+      width: 420px;
+      max-width: 90vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+      animation: slideUp 0.2s;
+    }
+
+    .modal h2 { font-size: 18px; margin-bottom: 20px; color: var(--text); }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--text); }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: 0.15s;
+      background: #f8fafc;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none; border-color: var(--primary); background: white; box-shadow: 0 0 0 3px rgba(43,95,138,0.1);
+    }
+
+    .modal-actions {
+      display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px;
+    }
+
+    /* Batch section */
+    .batch-section {
+      margin-top: 16px;
+      border-top: 1px dashed var(--border);
+      padding-top: 16px;
+    }
+    .batch-header {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .batch-header .icon { font-size: 16px; }
+    .batch-section textarea {
+      width: 100%;
+      height: 100px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      resize: vertical;
+      background: #f8fafc;
+      line-height: 1.6;
+    }
+    .batch-section textarea:focus {
+      outline: none; border-color: var(--primary); background: white; box-shadow: 0 0 0 3px rgba(43,95,138,0.1);
+    }
+    .batch-hint {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    /* Tooltip */
+    .tooltip {
+      position: fixed;
+      background: #1e293b;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 2000;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    .tooltip.show { opacity: 1; }
+
+    /* Context Menu */
+    .context-menu {
+      position: fixed;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      padding: 4px;
+      min-width: 180px;
+      z-index: 1500;
+      animation: slideUp 0.15s;
+    }
+    .context-menu-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      font-family: inherit;
+      color: var(--text);
+    }
+    .context-menu-item:hover { background: var(--primary-light); color: var(--primary); }
+    .context-menu-item.danger:hover { background: #fef2f2; color: var(--node-red); }
+    .context-divider { height: 1px; background: var(--border); margin: 4px 10px; }
+
+    /* Scrollbar */
+    .canvas-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .canvas-scroll::-webkit-scrollbar-track { background: transparent; }
+    .canvas-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+    /* Toast */
+    .toast-container { position: fixed; top: 20px; right: 20px; z-index: 3000; display: flex; flex-direction: column; gap: 8px; }
+    .toast {
+      background: white; border-radius: 10px; padding: 12px 20px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+      font-size: 13px; display: flex; align-items: center; gap: 8px;
+      animation: slideIn 0.2s;
+      min-width: 200px;
+    }
+    @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .toast.success { border-left: 3px solid #22c55e; }
+    .toast.error { border-left: 3px solid #ef4444; }
+
+    /* Keyboard shortcuts */
+    .shortcut-hint {
+      display: inline-block;
+      padding: 1px 6px;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    /* Info panel */
+    .info-panel {
+      position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: white;
+      border-radius: 20px;
+      padding: 6px 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      gap: 16px;
+      pointer-events: none;
+    }
+    .info-panel span { display: flex; align-items: center; gap: 4px; }
+
+    /* Display Settings Dropdown */
+    .display-settings-wrap {
+      position: relative;
+    }
+    .display-settings-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 6px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      padding: 12px 16px;
+      min-width: 180px;
+      z-index: 200;
+      display: none;
+      animation: slideUp 0.15s;
+    }
+    .display-settings-dropdown.show {
+      display: block;
+    }
+    .display-settings-dropdown label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .display-settings-dropdown input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    /* History dropdown */
+    .history-wrap { position: relative; }
+    .history-dropdown {
+      position: absolute; top: 100%; right: 0; margin-top: 6px;
+      background: white; border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      min-width: 260px; max-height: 360px; overflow-y: auto;
+      z-index: 200; display: none;
+    }
+    .history-dropdown.show { display: block; animation: slideUp 0.15s; }
+    .history-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f1f5f9;
+      font-size: 13px; transition: 0.1s;
+    }
+    .history-item:hover { background: #f8fafc; }
+    .history-item:last-child { border-bottom: none; }
+    .history-item .hi-name { font-weight: 500; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history-item .hi-time { font-size: 11px; color: #94a3b8; margin: 0 8px; white-space: nowrap; }
+    .history-item .hi-del { color: #ef4444; font-size: 16px; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
+    .history-item .hi-del:hover { background: #fef2f2; }
+    .history-empty { padding: 20px 14px; text-align: center; color: #94a3b8; font-size: 13px; }
+    .history-actions { padding: 8px 14px; border-top: 1px solid #f1f5f9; display: flex; gap: 6px; }
+    .history-actions .btn { flex: 1; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <span class="logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="8" y="14" width="7" height="7" rx="1"/><line x1="6.5" y1="10" x2="6.5" y2="14"/><line x1="17.5" y1="10" x2="17.5" y2="14"/><line x1="6.5" y1="14" x2="11.5" y2="17.5"/><line x1="17.5" y1="14" x2="11.5" y2="17.5"/></svg>
+      组织架构图编辑器
+    </span>
+    <div class="divider"></div>
+    <button class="btn btn-primary btn-sm" onclick="addRootNode()" title="添加根部门">
+      + 新建根部门
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="addNodeToSelected()" title="添加子部门">
+      + 添加子部门
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="editSelected()" title="编辑选中部门">
+      ✏️ 编辑
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="deleteSelected()" title="删除选中部门">
+      🗑 删除
+    </button>
+    <div class="divider"></div>
+    <button class="btn btn-outline btn-sm" onclick="exportJSON()" title="导出JSON">
+      📥 导出JSON
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()" title="导入JSON">
+      📤 导入
+    </button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+    <button class="btn btn-outline btn-sm" onclick="exportPNG()" title="导出PNG图片">
+      🖼 导出图片
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="resetToDefault()" title="重置为示例数据">
+      🔄 重置
+    </button>
+    <div class="divider"></div>
+    <button class="btn btn-outline btn-sm" onclick="changeLayout('tree')" title="树形布局(向下)">
+      ↓ 树形
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="changeLayout('left')" title="左侧展开">
+      ← 左展开
+    </button>
+    <div class="zoom-control">
+      <button class="btn-icon" onclick="zoomOut()" title="缩小">🔍−</button>
+      <span class="zoom-val" id="zoomDisplay">100%</span>
+      <button class="btn-icon" onclick="zoomIn()" title="放大">🔍+</button>
+      <button class="btn-icon" onclick="zoomReset()" title="重置缩放">↺</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="fitToScreen()" title="适应屏幕">⊞ 适应</button>
+    <div class="display-settings-wrap">
+      <button class="btn btn-outline btn-sm" onclick="toggleDisplaySettings()" title="显示设置">⚙ 显示</button>
+      <div class="display-settings-dropdown" id="displaySettingsDropdown">
+        <label><input type="checkbox" id="chkShowManager" onchange="updateDisplaySettings()"> 显示负责人</label>
+        <label><input type="checkbox" id="chkShowCount" onchange="updateDisplaySettings()"> 显示人数</label>
+      </div>
+    </div>
+    <div class="history-wrap">
+      <button class="btn btn-outline btn-sm" onclick="toggleHistory()" title="历史版本">📋 历史</button>
+      <div class="history-dropdown" id="historyDropdown">
+        <div id="historyList"></div>
+        <div class="history-actions">
+          <button class="btn btn-outline btn-sm" onclick="saveToHistory()">💾 保存当前</button>
+          <button class="btn btn-outline btn-sm" onclick="exportAllHistory()">📥 全部导出</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-container" id="canvasContainer">
+    <div class="canvas-scroll" id="canvasScroll">
+      <div class="canvas-inner" id="canvasInner">
+        <svg class="lines-svg" id="linesSvg"></svg>
+      </div>
+    </div>
+    <div class="info-panel" id="infoPanel">
+      <span>🖱 拖拽交换</span>
+      <span>🖱🖱 滚轮缩放</span>
+      <span>🖱 右键菜单</span>
+      <span>⌨ Del 删除</span>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay" style="display:none">
+    <div class="modal">
+      <h2 id="modalTitle">编辑节点</h2>
+      <div class="form-group">
+        <label>部门名称</label>
+        <input type="text" id="editName" placeholder="如：技术部">
+      </div>
+      <div class="form-group">
+        <label>负责人</label>
+        <input type="text" id="editManager" placeholder="如：张三">
+      </div>
+      <div class="form-group">
+        <label>人数</label>
+        <input type="number" id="editCount" placeholder="部门人数" min="0" value="0">
+      </div>
+      <div class="form-group">
+        <label>颜色主题</label>
+        <select id="editColor">
+          <option value="blue">蓝色 (默认)</option>
+          <option value="green">绿色</option>
+          <option value="purple">紫色</option>
+          <option value="orange">橙色</option>
+          <option value="red">红色</option>
+          <option value="teal">青色</option>
+        </select>
+      </div>
+      <div class="batch-section" id="batchSection" style="display:none">
+        <div class="batch-header"><span class="icon">📋</span> 批量添加子部门</div>
+        <textarea id="batchNames" placeholder="每行输入一个部门名称，如：&#10;前端组&#10;后端组&#10;测试组"></textarea>
+        <div class="batch-hint">一行一个，将统一添加为子部门（继承上方颜色设置）</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-sm" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary btn-sm" onclick="saveNode()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div class="context-menu" id="contextMenu" style="display:none">
+    <button class="context-menu-item" onclick="addChildFromContext()">➕ 添加子部门</button>
+    <button class="context-menu-item" onclick="editFromContext()">✏️ 编辑</button>
+    <button class="context-menu-item" onclick="duplicateFromContext()">📋 复制</button>
+    <div class="context-divider"></div>
+    <button class="context-menu-item danger" onclick="deleteFromContext()">🗑 删除</button>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    // ============ DATA MODEL ============
+    let orgData = null;
+    let selectedNodeId = null;
+    let contextNodeId = null;
+    let editingNodeId = null; // null = creating new root, string = editing existing
+    let editingParentId = null; // parent for new node
+    let currentLayout = 'tree'; // tree | left
+    let zoomLevel = 1;
+    let nodeElements = new Map();
+    let panX = 0, panY = 0;
+    let isPanning = false;
+    let startPanX = 0, startPanY = 0;
+    let startMouseX = 0, startMouseY = 0;
+
+    // Display settings
+    let displaySettings = {
+      showManager: false,
+      showCount: false
+    };
+
+    // Drag state
+    let dragNodeId = null;
+
+    const defaultData = {
+      id: 'root',
+      name: 'PBU 口岸事业部',
+      manager: '',
+      count: 0,
+      color: 'blue',
+      children: [
+        {
+          id: 'dept-1', name: '交付运营部', manager: '王瀚驰', count: 45, color: 'blue',
+          children: [
+            { id: 'dept-1-1', name: '运营一组', manager: '李明', count: 15, color: 'blue', children: [] },
+            { id: 'dept-1-2', name: '运营二组', manager: '王芳', count: 18, color: 'blue', children: [] },
+            { id: 'dept-1-3', name: '质量管理组', manager: '赵刚', count: 12, color: 'blue', children: [] },
+          ]
+        },
+        {
+          id: 'dept-2', name: '销售客服部', manager: '陈思华', count: 32, color: 'blue',
+          children: [
+            { id: 'dept-2-1', name: '销售组', manager: '刘洋', count: 18, color: 'blue', children: [] },
+            { id: 'dept-2-2', name: '客服组', manager: '周敏', count: 14, color: 'blue', children: [] },
+          ]
+        },
+        {
+          id: 'dept-3', name: '经营管理部', manager: '黄雪香', count: 20, color: 'blue',
+          children: [
+            { id: 'dept-3-1', name: '经营分析组', manager: '吴强', count: 10, color: 'blue', children: [] },
+            { id: 'dept-3-2', name: '战略规划组', manager: '郑丽', count: 10, color: 'blue', children: [] },
+          ]
+        },
+        {
+          id: 'dept-4', name: '技术部', manager: '李章勇', count: 38, color: 'green',
+          children: [
+            { id: 'dept-4-1', name: '前端组', manager: '孙伟', count: 12, color: 'green', children: [] },
+            { id: 'dept-4-2', name: '后端组', manager: '钱多', count: 15, color: 'green', children: [] },
+            { id: 'dept-4-3', name: '测试组', manager: '韩雪', count: 11, color: 'green', children: [] },
+          ]
+        },
+        {
+          id: 'dept-5', name: '人力行政部', manager: '刘永龙', count: 16, color: 'purple',
+          children: [
+            { id: 'dept-5-1', name: '招聘组', manager: '冯丽', count: 8, color: 'purple', children: [] },
+            { id: 'dept-5-2', name: '行政组', manager: '陈磊', count: 8, color: 'purple', children: [] },
+          ]
+        },
+        {
+          id: 'dept-6', name: '财务部', manager: '王旭', count: 12, color: 'orange',
+          children: [
+            { id: 'dept-6-1', name: '核算组', manager: '林燕', count: 6, color: 'orange', children: [] },
+            { id: 'dept-6-2', name: '预算组', manager: '杨峰', count: 6, color: 'orange', children: [] },
+          ]
+        },
+      ]
+    };
+
+    let idCounter = 100;
+
+    function generateId() { return 'node-' + (idCounter++); }
+
+    // Deep clone data
+    function cloneData(data) {
+      return JSON.parse(JSON.stringify(data));
+    }
+
+    // Find node by id
+    function findNode(data, id) {
+      if (data.id === id) return data;
+      for (const child of data.children || []) {
+        const found = findNode(child, id);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    // Find parent of node
+    function findParent(data, id) {
+      for (const child of data.children || []) {
+        if (child.id === id) return data;
+        const found = findParent(child, id);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    // Delete node
+    function deleteNode(data, id) {
+      data.children = (data.children || []).filter(c => c.id !== id);
+      for (const child of data.children) {
+        deleteNode(child, id);
+      }
+    }
+
+    // Count total nodes
+    function countNodes(data) {
+      let count = 1;
+      for (const child of data.children || []) {
+        count += countNodes(child);
+      }
+      return count;
+    }
+
+    // Get depth of node
+    function getDepth(data, id, d = 1) {
+      if (data.id === id) return d;
+      for (const child of data.children || []) {
+        const depth = getDepth(child, id, d + 1);
+        if (depth) return depth;
+      }
+      return 0;
+    }
+
+    // ============ INIT ============
+    function init() {
+      orgData = cloneData(defaultData);
+      idCounter = 200;
+      render();
+    }
+
+    function resetToDefault() {
+      if (confirm('确定要重置为默认示例数据吗？当前修改将丢失。')) {
+        orgData = cloneData(defaultData);
+        idCounter = 200;
+        selectedNodeId = null;
+        render();
+        showToast('已重置为默认数据', 'success');
+      }
+    }
+
+    // ============ LAYOUT CALCULATION ============
+    const NODE_WIDTH = 170;
+    const NODE_HEIGHT = 80;
+    const H_GAP = 40;
+    const V_GAP = 80;
+    const LEFT_H_GAP = 240;
+    const LEFT_V_GAP = 50;
+
+    function calcTreeLayout(data, depth = 0, xOffset = 0) {
+      if (!data) return { x: 0, y: 0, totalWidth: 0 };
+      
+      const children = data.children || [];
+      
+      if (children.length === 0) {
+        data._x = xOffset + NODE_WIDTH / 2;
+        data._y = depth * (NODE_HEIGHT + V_GAP);
+        data._depth = depth;
+        return { x: data._x, y: data._y, totalWidth: NODE_WIDTH };
+      }
+
+      let totalWidth = 0;
+      let childOffsets = [];
+      let currentX = xOffset;
+
+      for (const child of children) {
+        const result = calcTreeLayout(child, depth + 1, currentX);
+        childOffsets.push({ child, result });
+        currentX += result.totalWidth + H_GAP;
+        totalWidth += result.totalWidth;
+      }
+      totalWidth += Math.max(0, (children.length - 1) * H_GAP);
+
+      const firstChild = children[0];
+      const lastChild = children[children.length - 1];
+      data._x = (firstChild._x + lastChild._x) / 2;
+      data._y = depth * (NODE_HEIGHT + V_GAP);
+      data._depth = depth;
+
+      // Ensure minimum width
+      if (totalWidth < NODE_WIDTH) totalWidth = NODE_WIDTH;
+
+      return { x: data._x, y: data._y, totalWidth };
+    }
+
+    function calcLeftLayout(data, depth = 0, accY = 0) {
+      if (!data) return { totalHeight: 0 };
+      
+      const children = data.children || [];
+      
+      if (children.length === 0) {
+        data._x = depth * LEFT_H_GAP;
+        data._y = accY;
+        data._depth = depth;
+        return { totalHeight: NODE_HEIGHT + LEFT_V_GAP };
+      }
+
+      let currentY = accY;
+      let totalHeight = 0;
+      let childYOffsets = [];
+
+      for (const child of children) {
+        const result = calcLeftLayout(child, depth + 1, currentY);
+        childYOffsets.push({ child, y: currentY });
+        currentY += result.totalHeight;
+        totalHeight += result.totalHeight;
+      }
+
+      const firstChildY = children[0]._y;
+      const lastChildY = children[children.length - 1]._y;
+      data._x = depth * LEFT_H_GAP;
+      data._y = (firstChildY + lastChildY) / 2;
+      data._depth = depth;
+
+      return { totalHeight };
+    }
+
+    function relayout() {
+      if (currentLayout === 'tree') {
+        calcTreeLayout(orgData);
+      } else {
+        calcLeftLayout(orgData);
+      }
+    }
+
+    // ============ RENDERING ============
+    function render() {
+      relayout();
+      
+      const inner = document.getElementById('canvasInner');
+      const svg = document.getElementById('linesSvg');
+      
+      // Clear existing nodes (keep SVG)
+      inner.querySelectorAll('.org-node').forEach(el => el.remove());
+      nodeElements.clear();
+      
+      // Collect all nodes
+      const allNodes = [];
+      function collectNodes(data) {
+        allNodes.push(data);
+        for (const child of data.children || []) {
+          collectNodes(child);
+        }
+      }
+      collectNodes(orgData);
+
+      // Calculate canvas size
+      let maxX = 0, maxY = 0;
+      allNodes.forEach(n => {
+        maxX = Math.max(maxX, (n._x || 0) + NODE_WIDTH + 60);
+        maxY = Math.max(maxY, (n._y || 0) + NODE_HEIGHT + 60);
+      });
+
+      // Update SVG size
+      svg.setAttribute('width', maxX + 'px');
+      svg.setAttribute('height', maxY + 'px');
+      svg.innerHTML = '';
+
+      // Draw lines
+      function drawLines(data) {
+        const children = data.children || [];
+        for (const child of children) {
+          // Parent center-bottom -> Child center-top
+          const pCenterX = (data._x || 0) + NODE_WIDTH / 2;
+          const pCenterY = (data._y || 0) + NODE_HEIGHT;
+          const cCenterX = (child._x || 0) + NODE_WIDTH / 2;
+          const cCenterY = child._y || 0;
+
+          if (currentLayout === 'tree') {
+            // Tree layout: vertical from parent bottom-center, then horizontal to child center, then down to child top-center
+            const midY = pCenterY + (cCenterY - pCenterY) / 2;
+            const path = `M ${pCenterX} ${pCenterY} L ${pCenterX} ${midY} L ${cCenterX} ${midY} L ${cCenterX} ${cCenterY}`;
+            svg.innerHTML += `<path d="${path}" opacity="0.4"/>`;
+          } else {
+            // Left layout: horizontal from parent right-center, then to child left-center
+            const midX = pCenterX + (cCenterX - pCenterX) / 2;
+            const pRightX = (data._x || 0) + NODE_WIDTH;
+            const pMidY = (data._y || 0) + NODE_HEIGHT / 2;
+            const cMidY = (child._y || 0) + NODE_HEIGHT / 2;
+            const path = `M ${pRightX} ${pMidY} L ${midX} ${pMidY} L ${midX} ${cMidY} L ${cCenterX - NODE_WIDTH/2} ${cMidY}`;
+            svg.innerHTML += `<path d="${path}" opacity="0.4"/>`;
+          }
+          
+          drawLines(child);
+        }
+      }
+      drawLines(orgData);
+
+      // Render nodes
+      for (const node of allNodes) {
+        const el = createNodeElement(node);
+        inner.appendChild(el);
+        nodeElements.set(node.id, el);
+      }
+
+      // Set inner size
+      inner.style.width = Math.max(maxX + 200, window.innerWidth) + 'px';
+      inner.style.height = Math.max(maxY + 200, window.innerHeight) + 'px';
+
+      applyTransform();
+    }
+
+    function createNodeElement(node) {
+      const el = document.createElement('div');
+      el.className = 'org-node';
+      el.id = 'node-el-' + node.id;
+      el.style.left = (node._x || 0) + 'px';
+      el.style.top = (node._y || 0) + 'px';
+      el.dataset.depth = node._depth || 0;
+      el.dataset.color = node.color || 'blue';
+
+      if (node.id === selectedNodeId) {
+        el.classList.add('selected');
+      }
+
+      // Determine level class
+      const depth = node._depth || 0;
+      let levelClass = 'level-1';
+      if (depth === 0) levelClass = 'root-node';
+      else if (depth === 1) levelClass = 'level-1';
+      else if (depth === 2) levelClass = 'level-2';
+      else levelClass = 'level-3';
+
+      // Color override
+      let cardStyle = '';
+      if (node.color && node.color !== 'blue' && depth > 0) {
+        const colors = {
+          green: 'background: linear-gradient(135deg, #0d9488, #14b8a6);',
+          purple: 'background: linear-gradient(135deg, #7c3aed, #8b5cf6);',
+          orange: 'background: linear-gradient(135deg, #ea580c, #f97316);',
+          red: 'background: linear-gradient(135deg, #dc2626, #ef4444);',
+          teal: 'background: linear-gradient(135deg, #0891b2, #06b6d4);',
+        };
+        cardStyle = colors[node.color] || '';
+      }
+
+      const managerHtml = (displaySettings.showManager && node.manager) ? `<div class="node-manager">👤 ${node.manager}</div>` : '';
+      const countHtml = (displaySettings.showCount && node.count > 0) ? `<div class="node-count">${node.count}</div>` : '';
+
+
+      el.innerHTML = `
+        <div class="node-actions">
+          <button class="node-action-btn" onclick="event.stopPropagation(); editNode('${node.id}')" title="编辑">✏️</button>
+          <button class="node-action-btn" onclick="event.stopPropagation(); addChild('${node.id}')" title="添加子部门">➕</button>
+          <button class="node-action-btn" onclick="event.stopPropagation(); duplicateNode('${node.id}')" title="复制">📋</button>
+          ${depth > 0 ? `<button class="node-action-btn delete" onclick="event.stopPropagation(); deleteNodeById('${node.id}')" title="删除">🗑</button>` : ''}
+        </div>
+        <div class="node-card ${levelClass}" style="${cardStyle}">
+          <div class="node-name">${escapeHtml(node.name)}</div>
+          ${managerHtml}
+          ${countHtml}
+        </div>
+        <button class="add-child-btn" onclick="event.stopPropagation(); addChild('${node.id}')">+ 添加子部门</button>
+      `;
+
+      // Make draggable
+      el.draggable = true;
+
+      // Events
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectNode(node.id);
+      });
+
+      el.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        editNode(node.id);
+      });
+
+      el.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e, node.id);
+      });
+
+      // Drag events
+      el.addEventListener('dragstart', (e) => {
+        dragNodeId = node.id;
+        el.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', node.id);
+      });
+
+      el.addEventListener('dragend', (e) => {
+        el.style.opacity = '1';
+        dragNodeId = null;
+        // Remove all drag-over highlights
+        document.querySelectorAll('.node-card.drag-over').forEach(c => c.classList.remove('drag-over'));
+      });
+
+      el.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragNodeId && dragNodeId !== node.id) {
+          const card = el.querySelector('.node-card');
+          if (card) card.classList.add('drag-over');
+        }
+      });
+
+      el.addEventListener('dragleave', (e) => {
+        const card = el.querySelector('.node-card');
+        if (card) card.classList.remove('drag-over');
+      });
+
+      el.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = el.querySelector('.node-card');
+        if (card) card.classList.remove('drag-over');
+
+        if (!dragNodeId || dragNodeId === node.id) return;
+
+        // Move dragged node into target
+        moveNode(dragNodeId, node.id);
+        dragNodeId = null;
+      });
+
+      return el;
+    }
+
+    function countAllChildren(node) {
+      let count = 0;
+      for (const child of node.children || []) {
+        count += 1 + countAllChildren(child);
+      }
+      return count;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function applyTransform() {
+      const inner = document.getElementById('canvasInner');
+      inner.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+      document.getElementById('zoomDisplay').textContent = Math.round(zoomLevel * 100) + '%';
+    }
+
+    function selectNode(id) {
+      // Remove previous selection
+      if (selectedNodeId && nodeElements.has(selectedNodeId)) {
+        nodeElements.get(selectedNodeId).classList.remove('selected');
+      }
+      selectedNodeId = id;
+      if (nodeElements.has(id)) {
+        nodeElements.get(id).classList.add('selected');
+      }
+    }
+
+    // ============ ACTIONS ============
+    function addRootNode() {
+      editingNodeId = null;
+      editingParentId = null;
+      openModal('新建根部门', { name: '', manager: '', count: 0, color: 'blue' });
+    }
+
+    function addChild(parentId) {
+      editingNodeId = null;
+      editingParentId = parentId;
+      openModal('添加子部门', { name: '', manager: '', count: 0, color: 'blue' });
+    }
+
+    function addNodeToSelected() {
+      if (!selectedNodeId) {
+        showToast('请先选中一个部门', 'error');
+        return;
+      }
+      addChild(selectedNodeId);
+    }
+
+    function editNode(id) {
+      const node = findNode(orgData, id);
+      if (!node) return;
+      editingNodeId = id;
+      editingParentId = null;
+      openModal('编辑部门', { name: node.name, manager: node.manager || '', count: node.count || 0, color: node.color || 'blue' });
+    }
+
+    function editSelected() {
+      if (!selectedNodeId) {
+        showToast('请先选中一个部门', 'error');
+        return;
+      }
+      editNode(selectedNodeId);
+    }
+
+    function deleteNodeById(id) {
+      const node = findNode(orgData, id);
+      if (!node) return;
+      const childCount = countAllChildren(node);
+      const msg = childCount > 0 
+        ? `确定要删除"${node.name}"吗？\n该部门下有 ${childCount} 个子部门，将一并删除。`
+        : `确定要删除"${node.name}"吗？`;
+      
+      if (!confirm(msg)) return;
+      
+      if (id === orgData.id) {
+        showToast('根节点不能删除', 'error');
+        return;
+      }
+
+      deleteNode(orgData, id);
+      if (selectedNodeId === id) selectedNodeId = null;
+      render();
+      showToast('已删除', 'success');
+    }
+
+    function deleteSelected() {
+      if (!selectedNodeId) {
+        showToast('请先选中一个部门', 'error');
+        return;
+      }
+      deleteNodeById(selectedNodeId);
+    }
+
+    function duplicateNode(id) {
+      const node = findNode(orgData, id);
+      if (!node) return;
+      const parent = findParent(orgData, id);
+      if (!parent) return;
+
+      const cloned = cloneData(node);
+      cloned.id = generateId();
+      cloned.name = node.name + ' (副本)';
+      
+      // Reset all ids in cloned tree
+      function resetIds(n) {
+        n.id = generateId();
+        for (const child of n.children || []) {
+          resetIds(child);
+        }
+      }
+      resetIds(cloned);
+
+      parent.children.push(cloned);
+      render();
+      showToast('已复制', 'success');
+    }
+
+    // ============ DRAG & DROP MOVE ============
+    function moveNode(draggedId, targetId) {
+      if (draggedId === orgData.id) {
+        showToast('根节点不能移动', 'error');
+        return;
+      }
+
+      const draggedNode = findNode(orgData, draggedId);
+      const targetNode = findNode(orgData, targetId);
+      if (!draggedNode || !targetNode) return;
+
+      // Prevent moving a node into its own subtree
+      function isDescendant(parent, childId) {
+        if (parent.id === childId) return true;
+        for (const c of parent.children || []) {
+          if (isDescendant(c, childId)) return true;
+        }
+        return false;
+      }
+      if (isDescendant(draggedNode, targetId)) {
+        showToast('不能将节点移到自己的子节点下', 'error');
+        return;
+      }
+
+      const draggedParent = findParent(orgData, draggedId);
+      const targetParent = findParent(orgData, targetId);
+
+      if (!draggedParent) {
+        showToast('无法移动根节点', 'error');
+        return;
+      }
+
+      // If target is root, move as child of root
+      if (targetId === orgData.id) {
+        // Remove from old parent
+        draggedParent.children = draggedParent.children.filter(c => c.id !== draggedId);
+        // Add as last child of root
+        orgData.children.push(draggedNode);
+        render();
+        showToast('已移动', 'success');
+        return;
+      }
+
+      // Remove from old parent
+      draggedParent.children = draggedParent.children.filter(c => c.id !== draggedId);
+
+      // If target is at same level as dragged, insert at target's position
+      if (targetParent && draggedParent.id === targetParent.id) {
+        const idx = targetParent.children.findIndex(c => c.id === targetId);
+        if (idx >= 0) {
+          targetParent.children.splice(idx, 0, draggedNode);
+        } else {
+          targetParent.children.push(draggedNode);
+        }
+      } else {
+        // Move to become a child of target
+        targetNode.children.push(draggedNode);
+      }
+
+      render();
+      showToast('已移动', 'success');
+    }
+
+    // ============ DISPLAY SETTINGS ============
+    function toggleDisplaySettings() {
+      const dropdown = document.getElementById('displaySettingsDropdown');
+      dropdown.classList.toggle('show');
+      // Sync checkbox state
+      document.getElementById('chkShowManager').checked = displaySettings.showManager;
+      document.getElementById('chkShowCount').checked = displaySettings.showCount;
+    }
+
+    function updateDisplaySettings() {
+      displaySettings.showManager = document.getElementById('chkShowManager').checked;
+      displaySettings.showCount = document.getElementById('chkShowCount').checked;
+      render();
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      const wrap1 = document.querySelector('.display-settings-wrap');
+      const dd1 = document.getElementById('displaySettingsDropdown');
+      if (wrap1 && dd1 && !wrap1.contains(e.target)) {
+        dd1.classList.remove('show');
+      }
+      const wrap2 = document.querySelector('.history-wrap');
+      const dd2 = document.getElementById('historyDropdown');
+      if (wrap2 && dd2 && !wrap2.contains(e.target)) {
+        dd2.classList.remove('show');
+      }
+    });
+
+    // ============ HISTORY ============
+    const HISTORY_KEY = 'org-chart-history';
+    const MAX_HISTORY = 30;
+
+    function getHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+      } catch(e) { return []; }
+    }
+
+    function saveToHistory() {
+      const history = getHistory();
+      const rootName = orgData?.name || '未命名';
+      const now = new Date();
+      const ts = now.toLocaleString('zh-CN');
+
+      history.unshift({
+        id: Date.now().toString(),
+        name: rootName,
+        time: ts,
+        data: JSON.parse(JSON.stringify(orgData))
+      });
+
+      // Trim
+      if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+      renderHistoryList();
+      showToast('已保存到历史', 'success');
+    }
+
+    function loadHistory(id) {
+      const history = getHistory();
+      const item = history.find(h => h.id === id);
+      if (!item || !confirm(`确定要加载"${item.name}"（${item.time}）吗？当前修改将丢失。`)) return;
+
+      orgData = JSON.parse(JSON.stringify(item.data));
+      selectedNodeId = null;
+      render();
+      document.getElementById('historyDropdown').classList.remove('show');
+      showToast('已加载历史版本', 'success');
+    }
+
+    function deleteHistory(id) {
+      const history = getHistory();
+      const idx = history.findIndex(h => h.id === id);
+      if (idx < 0) return;
+      const name = history[idx].name;
+      if (!confirm(`确定删除"${name}"吗？`)) return;
+
+      history.splice(idx, 1);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+      renderHistoryList();
+      showToast('已删除', 'success');
+    }
+
+    function exportAllHistory() {
+      const history = getHistory();
+      if (history.length === 0) {
+        showToast('历史记录为空', 'error');
+        return;
+      }
+      const json = JSON.stringify(history, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '组织架构图_历史_' + new Date().toISOString().slice(0, 10) + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`已导出 ${history.length} 条历史`, 'success');
+    }
+
+    function toggleHistory() {
+      const dd = document.getElementById('historyDropdown');
+      dd.classList.toggle('show');
+      if (dd.classList.contains('show')) {
+        renderHistoryList();
+      }
+    }
+
+    function renderHistoryList() {
+      const container = document.getElementById('historyList');
+      const history = getHistory();
+      if (history.length === 0) {
+        container.innerHTML = '<div class="history-empty">暂无历史记录</div>';
+        return;
+      }
+      container.innerHTML = history.map(h => `
+        <div class="history-item" onclick="loadHistory('${h.id}')">
+          <span class="hi-name" title="${h.name}">${h.name}</span>
+          <span class="hi-time">${h.time}</span>
+          <span class="hi-del" onclick="event.stopPropagation();deleteHistory('${h.id}')" title="删除">×</span>
+        </div>
+      `).join('');
+    }
+
+    // Update history on JSON export
+    const origExportJSON2 = exportJSON;
+    exportJSON = function() {
+      // also save to history
+      const history = getHistory();
+      const rootName = orgData?.name || '未命名';
+      history.unshift({
+        id: Date.now().toString(),
+        name: rootName,
+        time: new Date().toLocaleString('zh-CN'),
+        data: JSON.parse(JSON.stringify(orgData))
+      });
+      if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+      // call original
+      origExportJSON2();
+    };
+
+    // ============ MODAL ============
+    function openModal(title, data) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('editName').value = data.name;
+      document.getElementById('editManager').value = data.manager;
+      document.getElementById('editCount').value = data.count;
+      document.getElementById('editColor').value = data.color;
+      // Show batch section only when adding children (not editing existing node)
+      const isAddMode = !editingNodeId;  // adding new nodes => show batch
+      document.getElementById('batchSection').style.display = isAddMode ? 'block' : 'none';
+      if (!isAddMode) {
+        document.getElementById('batchNames').value = '';
+      }
+      document.getElementById('modalOverlay').style.display = 'flex';
+      document.getElementById('editName').focus();
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').style.display = 'none';
+    }
+
+    function saveNode() {
+      const name = document.getElementById('editName').value.trim();
+      const manager = document.getElementById('editManager').value.trim();
+      const count = parseInt(document.getElementById('editCount').value) || 0;
+      const color = document.getElementById('editColor').value;
+      const batchText = document.getElementById('batchNames').value.trim();
+
+      // Batch mode: multiple child departments
+      if (batchText) {
+        const lines = batchText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length === 0) {
+          showToast('请输入至少一个部门名称', 'error');
+          return;
+        }
+
+        const targetParent = editingNodeId 
+          ? findNode(orgData, editingNodeId)     // adding to selected node
+          : (editingParentId 
+              ? findNode(orgData, editingParentId) // adding to parent
+              : orgData);                          // adding to root
+
+        if (!targetParent) return;
+
+        lines.forEach(lineName => {
+          targetParent.children.push({
+            id: generateId(),
+            name: lineName,
+            manager: '',
+            count: 0,
+            color: color,
+            children: []
+          });
+        });
+
+        closeModal();
+        render();
+        showToast(`已批量添加 ${lines.length} 个子部门`, 'success');
+        return;
+      }
+
+      // Single mode
+      if (!name) {
+        showToast('请输入部门名称', 'error');
+        return;
+      }
+
+      if (editingNodeId) {
+        // Edit existing
+        const node = findNode(orgData, editingNodeId);
+        if (node) {
+          node.name = name;
+          node.manager = manager;
+          node.count = count;
+          node.color = color;
+        }
+      } else if (editingParentId) {
+        // Add child to parent
+        const parent = findNode(orgData, editingParentId);
+        if (parent) {
+          const newNode = {
+            id: generateId(),
+            name,
+            manager,
+            count,
+            color,
+            children: []
+          };
+          parent.children.push(newNode);
+        }
+      } else {
+        // Add new root
+        if (orgData.name) {
+          const newNode = {
+            id: generateId(),
+            name,
+            manager,
+            count,
+            color,
+            children: []
+          };
+          orgData.children.push(newNode);
+        }
+      }
+
+      closeModal();
+      render();
+      showToast('已保存', 'success');
+    }
+
+    // ============ CONTEXT MENU ============
+    function showContextMenu(e, id) {
+      contextNodeId = id;
+      selectNode(id);
+      const menu = document.getElementById('contextMenu');
+      menu.style.display = 'block';
+      menu.style.left = e.clientX + 'px';
+      menu.style.top = e.clientY + 'px';
+    }
+
+    function hideContextMenu() {
+      document.getElementById('contextMenu').style.display = 'none';
+    }
+
+    function addChildFromContext() {
+      if (contextNodeId) addChild(contextNodeId);
+      hideContextMenu();
+    }
+
+    function editFromContext() {
+      if (contextNodeId) editNode(contextNodeId);
+      hideContextMenu();
+    }
+
+    function duplicateFromContext() {
+      if (contextNodeId) duplicateNode(contextNodeId);
+      hideContextMenu();
+    }
+
+    function deleteFromContext() {
+      if (contextNodeId) deleteNodeById(contextNodeId);
+      hideContextMenu();
+    }
+
+    // ============ IMPORT / EXPORT ============
+    function exportJSON() {
+      const data = cloneData(orgData);
+      // Clean up layout properties
+      function cleanData(n) {
+        delete n._x; delete n._y; delete n._depth;
+        for (const child of n.children || []) cleanData(child);
+      }
+      cleanData(data);
+
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '组织架构_' + new Date().toISOString().slice(0, 10) + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('已导出JSON', 'success');
+    }
+
+    function importJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!data.id || !data.name) {
+            throw new Error('无效的组织架构数据');
+          }
+          orgData = data;
+          // Update id counter
+          let maxId = 0;
+          function findMaxId(n) {
+            const match = n.id.match(/node-(\d+)/);
+            if (match && parseInt(match[1]) > maxId) maxId = parseInt(match[1]);
+            for (const child of n.children || []) findMaxId(child);
+          }
+          findMaxId(orgData);
+          idCounter = maxId + 1;
+          
+          selectedNodeId = null;
+          render();
+          showToast('导入成功，共 ' + countNodes(orgData) + ' 个节点', 'success');
+        } catch (err) {
+          showToast('导入失败：' + err.message, 'error');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    // ============ EXPORT ============
+    function getExportCardColor(depth, nodeColor) {
+      // Custom color override for non-root, non-blue nodes
+      if (depth > 0 && nodeColor && nodeColor !== 'blue') {
+        const colors = {
+          green: '#14b8a6',
+          purple: '#8b5cf6',
+          orange: '#f97316',
+          red: '#ef4444',
+          teal: '#06b6d4',
+        };
+        return colors[nodeColor] || '#2b5f8a';
+      }
+      // Default level-based colors
+      if (depth === 0) return '#2b5f8a';
+      if (depth === 1) return '#2b5f8a';
+      if (depth === 2) return '#3a7bbf';
+      return '#4a8fc9';
+    }
+
+    function exportPNG() {
+      showToast('正在生成图片...', 'success');
+      
+      const inner = document.getElementById('canvasInner');
+      const container = document.getElementById('canvasContainer');
+      const linesSvg = document.getElementById('linesSvg');
+      
+      // Save & reset transform so we measure canvas-space coordinates
+      const origTransform = inner.style.transform;
+      const origOrigin = inner.style.transformOrigin;
+      inner.style.transform = 'none';
+      inner.style.transformOrigin = '0 0';
+      
+      // Force synchronous reflow — CRITICAL for accurate measurements
+      void inner.offsetHeight;
+      void container.offsetHeight;
+      
+      // Use SVG's bounding rect as origin — SVG is at (0,0) relative to the padding edge,
+      // and its coordinates match the d3 layout positions (node._x, node._y).
+      const svgRect = linesSvg.getBoundingClientRect();
+      const originX = svgRect.left;
+      const originY = svgRect.top;
+      
+      // ---- Collect all node card positions (canvas-space) ----
+      const nodes = [];
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      
+      inner.querySelectorAll('.org-node').forEach(el => {
+        const card = el.querySelector('.node-card');
+        if (!card) return;
+        
+        const cr = card.getBoundingClientRect();
+        const cx = cr.left - originX;
+        const cy = cr.top - originY;
+        const cw = cr.width;
+        const ch = cr.height;
+        
+        // Determine card color from data attributes (not computed style)
+        const depth = parseInt(el.dataset.depth) || 0;
+        const nodeColor = el.dataset.color || 'blue';
+        const bg = getExportCardColor(depth, nodeColor);
+        
+        nodes.push({ cx, cy, cw, ch, bg,
+          name: (el.querySelector('.node-name')?.textContent || ''),
+          manager: (el.querySelector('.node-manager')?.textContent || ''),
+          count: (el.querySelector('.node-count')?.textContent || ''),
+        });
+        
+        minX = Math.min(minX, cx);
+        minY = Math.min(minY, cy);
+        maxX = Math.max(maxX, cx + cw);
+        maxY = Math.max(maxY, cy + ch);
+      });
+      
+      // Expand by SVG line extents (SVG is also in canvas space)
+      linesSvg.querySelectorAll('path').forEach(p => {
+        const d = p.getAttribute('d');
+        const nums = d.match(/[\d.]+/g);
+        if (!nums) return;
+        for (let i = 0; i < nums.length; i += 2) {
+          if (i + 1 < nums.length) {
+            minX = Math.min(minX, parseFloat(nums[i]));
+            minY = Math.min(minY, parseFloat(nums[i+1]));
+            maxX = Math.max(maxX, parseFloat(nums[i]));
+            maxY = Math.max(maxY, parseFloat(nums[i+1]));
+          }
+        }
+      });
+      
+      // Restore transform NOW (before async operations)
+      inner.style.transform = origTransform;
+      inner.style.transformOrigin = origOrigin;
+      
+      const P = 100;
+      const W = Math.max(800, Math.ceil(maxX - minX + P * 2));
+      const H = Math.max(600, Math.ceil(maxY - minY + P * 2));
+      const offX = -minX + P;
+      const offY = -minY + P;
+      const scale = 2;
+      
+      // ---- Build export SVG ----
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('xmlns', ns);
+      svg.setAttribute('width', W);
+      svg.setAttribute('height', H);
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      
+      // Background
+      const bgRect = document.createElementNS(ns, 'rect');
+      bgRect.setAttribute('width', W);
+      bgRect.setAttribute('height', H);
+      bgRect.setAttribute('fill', '#f0f2f5');
+      svg.appendChild(bgRect);
+      
+      // Grid dots
+      const gridG = document.createElementNS(ns, 'g');
+      gridG.setAttribute('fill', '#dde3ed');
+      for (let gx = 0; gx < W; gx += 24) {
+        for (let gy = 0; gy < H; gy += 24) {
+          const dot = document.createElementNS(ns, 'circle');
+          dot.setAttribute('cx', gx);
+          dot.setAttribute('cy', gy);
+          dot.setAttribute('r', '0.5');
+          gridG.appendChild(dot);
+        }
+      }
+      svg.appendChild(gridG);
+      
+      // Connection lines
+      const lineG = document.createElementNS(ns, 'g');
+      lineG.setAttribute('transform', `translate(${offX}, ${offY})`);
+      lineG.setAttribute('stroke', '#3b6eb0');
+      lineG.setAttribute('stroke-width', '2.5');
+      lineG.setAttribute('fill', 'none');
+      lineG.setAttribute('stroke-linecap', 'round');
+      lineG.setAttribute('stroke-linejoin', 'round');
+      lineG.setAttribute('opacity', '0.75');
+      linesSvg.querySelectorAll('path').forEach(p => {
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('d', p.getAttribute('d'));
+        lineG.appendChild(path);
+      });
+      svg.appendChild(lineG);
+      
+      // Node cards
+      const cardG = document.createElementNS(ns, 'g');
+      cardG.setAttribute('transform', `translate(${offX}, ${offY})`);
+      
+      // Drop-shadow filter
+      const defs = document.createElementNS(ns, 'defs');
+      const filter = document.createElementNS(ns, 'filter');
+      filter.setAttribute('id', 'cardShadow');
+      filter.setAttribute('x', '-20%');
+      filter.setAttribute('y', '-20%');
+      filter.setAttribute('width', '140%');
+      filter.setAttribute('height', '160%');
+      const feDrop = document.createElementNS(ns, 'feDropShadow');
+      feDrop.setAttribute('dx', '0');
+      feDrop.setAttribute('dy', '6');
+      feDrop.setAttribute('stdDeviation', '6');
+      feDrop.setAttribute('flood-color', 'rgba(0,0,0,0.12)');
+      filter.appendChild(feDrop);
+      defs.appendChild(filter);
+      svg.appendChild(defs);
+      
+      nodes.forEach(n => {
+        const r = 10;
+        
+        // Card rect
+        const rect = document.createElementNS(ns, 'rect');
+        rect.setAttribute('x', n.cx);
+        rect.setAttribute('y', n.cy);
+        rect.setAttribute('width', n.cw);
+        rect.setAttribute('height', n.ch);
+        rect.setAttribute('rx', r);
+        rect.setAttribute('ry', r);
+        rect.setAttribute('fill', n.bg);
+        rect.setAttribute('filter', 'url(#cardShadow)');
+        cardG.appendChild(rect);
+        
+        const hasExtra = n.manager || n.count;
+        
+        // Name text
+        const nameTxt = document.createElementNS(ns, 'text');
+        nameTxt.setAttribute('x', n.cx + n.cw / 2);
+        nameTxt.setAttribute('y', hasExtra ? n.cy + n.ch * 0.35 : n.cy + n.ch / 2);
+        nameTxt.setAttribute('text-anchor', 'middle');
+        nameTxt.setAttribute('dominant-baseline', 'central');
+        nameTxt.setAttribute('fill', 'white');
+        nameTxt.setAttribute('font-size', '14');
+        nameTxt.setAttribute('font-weight', '600');
+        nameTxt.setAttribute('font-family', '-apple-system,"PingFang SC","Microsoft YaHei",sans-serif');
+        nameTxt.textContent = n.name;
+        cardG.appendChild(nameTxt);
+        
+        // Manager
+        if (n.manager) {
+          const mgr = document.createElementNS(ns, 'text');
+          mgr.setAttribute('x', n.cx + n.cw / 2);
+          mgr.setAttribute('y', n.cy + n.ch * 0.68);
+          mgr.setAttribute('text-anchor', 'middle');
+          mgr.setAttribute('dominant-baseline', 'central');
+          mgr.setAttribute('fill', 'rgba(255,255,255,0.7)');
+          mgr.setAttribute('font-size', '11');
+          mgr.setAttribute('font-family', '-apple-system,"PingFang SC","Microsoft YaHei",sans-serif');
+          mgr.textContent = n.manager;
+          cardG.appendChild(mgr);
+        }
+        
+        // Count badge
+        if (n.count) {
+          const bx = n.cx + n.cw - 8;
+          const by = n.cy - 8;
+          const circle = document.createElementNS(ns, 'circle');
+          circle.setAttribute('cx', bx);
+          circle.setAttribute('cy', by);
+          circle.setAttribute('r', '13');
+          circle.setAttribute('fill', '#ef4444');
+          cardG.appendChild(circle);
+          
+          const bt = document.createElementNS(ns, 'text');
+          bt.setAttribute('x', bx);
+          bt.setAttribute('y', by);
+          bt.setAttribute('text-anchor', 'middle');
+          bt.setAttribute('dominant-baseline', 'central');
+          bt.setAttribute('fill', 'white');
+          bt.setAttribute('font-size', '11');
+          bt.setAttribute('font-weight', 'bold');
+          bt.setAttribute('font-family', '-apple-system,sans-serif');
+          bt.textContent = n.count;
+          cardG.appendChild(bt);
+        }
+      });
+      
+      svg.appendChild(cardG);
+      
+      // ---- Convert SVG → Canvas → PNG download ----
+      const svgString = new XMLSerializer().serializeToString(svg);
+      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      
+      const img = new Image();
+      img.onload = function() {
+        const outCanvas = document.createElement('canvas');
+        outCanvas.width = W * scale;
+        outCanvas.height = H * scale;
+        const outCtx = outCanvas.getContext('2d');
+        outCtx.drawImage(img, 0, 0, W * scale, H * scale);
+        URL.revokeObjectURL(url);
+        
+        outCanvas.toBlob(function(pngBlob) {
+          const pngUrl = URL.createObjectURL(pngBlob);
+          const a = document.createElement('a');
+          a.href = pngUrl;
+          a.download = '组织架构图_' + new Date().toISOString().slice(0, 10) + '.png';
+          a.click();
+          URL.revokeObjectURL(pngUrl);
+          showToast('图片已导出', 'success');
+        });
+      };
+      img.onerror = function() {
+        URL.revokeObjectURL(url);
+        showToast('导出失败，请重试', 'error');
+      };
+      img.src = url;
+    }
+
+    // ============ ZOOM & PAN ============
+    function zoomIn() {
+      zoomLevel = Math.min(2.5, zoomLevel + 0.1);
+      applyTransform();
+    }
+
+    function zoomOut() {
+      zoomLevel = Math.max(0.3, zoomLevel - 0.1);
+      applyTransform();
+    }
+
+    function zoomReset() {
+      zoomLevel = 1;
+      panX = 0;
+      panY = 0;
+      applyTransform();
+    }
+
+    function fitToScreen() {
+      // Calculate bounds
+      const inner = document.getElementById('canvasInner');
+      let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
+      inner.querySelectorAll('.org-node').forEach(el => {
+        minX = Math.min(minX, el.offsetLeft);
+        minY = Math.min(minY, el.offsetTop);
+        maxX = Math.max(maxX, el.offsetLeft + el.offsetWidth);
+        maxY = Math.max(maxY, el.offsetTop + el.offsetHeight);
+      });
+
+      const contentW = maxX - minX + 100;
+      const contentH = maxY - minY + 100;
+      const container = document.getElementById('canvasScroll');
+      const containerW = container.clientWidth;
+      const containerH = container.clientHeight;
+
+      const scaleX = containerW / contentW;
+      const scaleY = containerH / contentH;
+      zoomLevel = Math.min(scaleX, scaleY, 1.5);
+      
+      panX = (containerW - contentW * zoomLevel) / 2 - minX * zoomLevel + 50 * zoomLevel;
+      panY = (containerH - contentH * zoomLevel) / 2 - minY * zoomLevel + 50 * zoomLevel;
+
+      applyTransform();
+    }
+
+    function changeLayout(layout) {
+      currentLayout = layout;
+      selectedNodeId = null;
+      render();
+      showToast('已切换为' + (layout === 'tree' ? '树形' : '左展开') + '布局', 'success');
+    }
+
+    // ============ MOUSE EVENTS ============
+    const canvasContainer = document.getElementById('canvasContainer');
+
+    canvasContainer.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.org-node') || e.target.closest('.context-menu') || e.target.closest('.modal-overlay')) {
+        return;
+      }
+      isPanning = true;
+      startPanX = panX;
+      startPanY = panY;
+      startMouseX = e.clientX;
+      startMouseY = e.clientY;
+      canvasContainer.classList.add('dragging');
+      hideContextMenu();
+      selectedNodeId = null;
+      render();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isPanning) return;
+      panX = startPanX + (e.clientX - startMouseX);
+      panY = startPanY + (e.clientY - startMouseY);
+      applyTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isPanning = false;
+      canvasContainer.classList.remove('dragging');
+    });
+
+    canvasContainer.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.05 : 0.05;
+      zoomLevel = Math.max(0.3, Math.min(2.5, zoomLevel + delta));
+
+      // Zoom to cursor
+      const rect = canvasContainer.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      
+      const newZoom = zoomLevel;
+      const oldZoom = zoomLevel - delta;
+      
+      panX = mx - (mx - panX) * (newZoom / oldZoom);
+      panY = my - (my - panY) * (newZoom / oldZoom);
+      
+      applyTransform();
+    }, { passive: false });
+
+    // Click outside to close context menu
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.context-menu')) {
+        hideContextMenu();
+      }
+    });
+
+    // Modal click outside to close
+    document.getElementById('modalOverlay').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('modalOverlay')) {
+        closeModal();
+      }
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      switch (e.key) {
+        case 'Delete':
+        case 'Backspace':
+          if (selectedNodeId) deleteNodeById(selectedNodeId);
+          break;
+        case 'Escape':
+          selectedNodeId = null;
+          render();
+          hideContextMenu();
+          break;
+        case 'F2':
+          if (selectedNodeId) editNode(selectedNodeId);
+          break;
+        case 'Enter':
+          if (selectedNodeId) editNode(selectedNodeId);
+          break;
+        case 'n':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            if (selectedNodeId) addChild(selectedNodeId);
+            else addRootNode();
+          }
+          break;
+        case 's':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            exportJSON();
+          }
+          break;
+        case '0':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            zoomReset();
+          }
+          break;
+        case '=':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            zoomIn();
+          }
+          break;
+        case '-':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            zoomOut();
+          }
+          break;
+      }
+    });
+
+    // Match node click to open edit directly on Enter
+    document.getElementById('editName').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') saveNode();
+      if (e.key === 'Escape') closeModal();
+    });
+
+    // ============ TOAST ============
+    function showToast(message, type) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast ' + type;
+      toast.textContent = message;
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+      }, 2500);
+    }
+
+    // ============ START ============
+    init();
+
+    // Fit to screen after render
+    setTimeout(fitToScreen, 200);
+
+    // Resize handler
+    window.addEventListener('resize', () => {
+      // Just re-render if needed
+    });
+
+    console.log('🏢 组织架构图编辑器已就绪');
+    console.log('  - 点击选中节点，双击或按 Enter 编辑');
+    console.log('  - 右键节点打开操作菜单');
+    console.log('  - Ctrl+N 添加子部门');
+    console.log('  - Delete 删除选中节点');
+    console.log('  - 鼠标滚轮缩放，拖拽空白区域平移');
+    console.log('  - Ctrl+S 导出JSON');
+  </script>
+</body>
+</html>
