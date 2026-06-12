@@ -1,0 +1,4 @@
+org_chart.sqlite3
+org_chart_secret.key
+__pycache__/
+*.pyc

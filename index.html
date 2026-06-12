@@ -41,13 +41,16 @@
     .toolbar {
       background: var(--card-bg);
       border-bottom: 1px solid var(--border);
-      padding: 8px 20px;
+      padding: 8px 16px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
+      row-gap: 8px;
+      flex-wrap: wrap;
       flex-shrink: 0;
       z-index: 100;
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: visible;
     }
 
     .toolbar .logo {
@@ -100,13 +103,14 @@
 
     .btn-sm { padding: 5px 10px; font-size: 12px; }
     .btn-xs { padding: 3px 8px; font-size: 11px; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
 
     .btn-icon { padding: 6px; border-radius: 6px; cursor: pointer; background: transparent; border: none; color: var(--text-secondary); display: flex; align-items: center; transition: 0.15s; }
     .btn-icon:hover { background: #f1f5f9; color: var(--text); }
 
     .zoom-control {
       display: flex; align-items: center; gap: 4px;
-      margin-left: auto;
+      margin-left: 0;
     }
     .zoom-control .zoom-val {
       font-size: 12px; color: var(--text-secondary); min-width: 40px; text-align: center;
@@ -170,8 +174,9 @@
       background: var(--node-blue);
       color: white;
       border-radius: var(--radius);
-      padding: 14px 18px;
-      min-width: 160px;
+      padding: 12px 14px;
+      width: 140px;
+      max-width: 140px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       transition: 0.2s;
       position: relative;
@@ -180,7 +185,7 @@
       justify-content: center;
       align-items: center;
       text-align: center;
-      min-height: 76px;
+      min-height: 60px;
     }
     .node-card.root-node { background: var(--node-blue); }
     .node-card.level-1 { background: var(--node-blue); }
@@ -197,6 +202,12 @@
       font-weight: 600;
       line-height: 1.3;
       text-align: center;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     .node-manager {
       font-size: 11px;
@@ -496,6 +507,60 @@
     .history-empty { padding: 20px 14px; text-align: center; color: #94a3b8; font-size: 13px; }
     .history-actions { padding: 8px 14px; border-top: 1px solid #f1f5f9; display: flex; gap: 6px; }
     .history-actions .btn { flex: 1; font-size: 12px; }
+
+
+/* Account and import */
+.account-wrap { display: flex; align-items: center; gap: 8px; }
+.account-status {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #f8fafc;
+}
+.account-status.signed-in { color: var(--primary); background: var(--primary-light); border-color: #bfdbfe; }
+.history-account-hint { padding: 10px 14px; color: var(--text-secondary); font-size: 12px; border-bottom: 1px solid #f1f5f9; }
+.auth-switch { display: flex; gap: 8px; margin-bottom: 16px; }
+.auth-switch .btn { flex: 1; justify-content: center; }
+.ocr-modal { width: 560px; }
+.ocr-textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  background: #f8fafc;
+  line-height: 1.6;
+}
+.ocr-progress { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; min-height: 18px; }
+.ocr-hint { font-size: 12px; color: #94a3b8; margin-top: 8px; line-height: 1.5; }
+
+
+
+    @media (max-width: 900px) {
+      .toolbar { padding: 8px 10px; gap: 6px; }
+      .toolbar .logo { width: 100%; margin-right: 0; }
+      .toolbar .divider { display: none; }
+      .btn { padding: 6px 10px; }
+      .account-status { max-width: 96px; }
+      .history-dropdown {
+        position: fixed;
+        top: auto;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        min-width: 0;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -533,11 +598,21 @@
       🔄 重置
     </button>
     <div class="divider"></div>
-    <button class="btn btn-outline btn-sm" onclick="changeLayout('tree')" title="树形布局(向下)">
-      ↓ 树形
+    <button class="btn btn-outline btn-sm" onclick="undo()" title="撤销 (Ctrl+Z)" id="btnUndo" disabled>
+      ↩ 撤销
     </button>
-    <button class="btn btn-outline btn-sm" onclick="changeLayout('left')" title="左侧展开">
-      ← 左展开
+    <button class="btn btn-outline btn-sm" onclick="redo()" title="重做 (Ctrl+Y)" id="btnRedo" disabled>
+      ↪ 重做
+    </button>
+    <div class="divider"></div>
+    <button class="btn btn-outline btn-sm" onclick="changeLayout('tree')" title="全部设为树形布局(向下)">
+      ↓ 全部树形
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="changeLayout('left')" title="全部设为左展开">
+      ← 全部左展
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="changeLayout('right')" title="全部设为右展开">
+      → 全部右展
     </button>
     <div class="zoom-control">
       <button class="btn-icon" onclick="zoomOut()" title="缩小">🔍−</button>
@@ -553,16 +628,28 @@
         <label><input type="checkbox" id="chkShowCount" onchange="updateDisplaySettings()"> 显示人数</label>
       </div>
     </div>
-    <div class="history-wrap">
-      <button class="btn btn-outline btn-sm" onclick="toggleHistory()" title="历史版本">📋 历史</button>
-      <div class="history-dropdown" id="historyDropdown">
-        <div id="historyList"></div>
-        <div class="history-actions">
-          <button class="btn btn-outline btn-sm" onclick="saveToHistory()">💾 保存当前</button>
-          <button class="btn btn-outline btn-sm" onclick="exportAllHistory()">📥 全部导出</button>
-        </div>
-      </div>
+<div class="divider"></div>
+<div class="account-wrap">
+  <span class="account-status" id="authStatusText">未登录</span>
+  <button class="btn btn-outline btn-sm" id="authButton" onclick="openAuthModal()">登录 / 注册</button>
+  <button class="btn btn-ghost btn-sm" id="logoutButton" onclick="logout()" style="display:none">退出</button>
+</div>
+<button class="btn btn-outline btn-sm" onclick="document.getElementById('imageImportFile').click()" title="从组织架构图片识别导入">
+  🧠 图片识别
+</button>
+<input type="file" id="imageImportFile" accept="image/*" style="display:none" onchange="importImageFile(event)">
+<div class="history-wrap">
+  <button class="btn btn-outline btn-sm" onclick="toggleHistory()" title="历史版本">📋 历史</button>
+  <div class="history-dropdown" id="historyDropdown">
+    <div class="history-account-hint" id="historyAccountHint">登录后历史会保存到本机 SQLite 数据库</div>
+    <div id="historyList"></div>
+    <div class="history-actions">
+      <button class="btn btn-outline btn-sm" onclick="saveToHistory()">💾 保存当前</button>
+      <button class="btn btn-outline btn-sm" onclick="recoverLegacyHistory()">↩ 恢复旧历史</button>
+      <button class="btn btn-outline btn-sm" onclick="exportAllHistory()">📥 全部导出</button>
     </div>
+  </div>
+</div>
   </div>
 
   <!-- Canvas -->
@@ -607,6 +694,14 @@
           <option value="teal">青色</option>
         </select>
       </div>
+      <div class="form-group">
+        <label>子节点布局方式</label>
+        <select id="editLayout">
+          <option value="tree">↓ 树形展开 (子节点横向排列)</option>
+          <option value="left">← 左展开 (子节点右侧竖向排列)</option>
+          <option value="right">→ 右展开 (子节点左侧竖向排列)</option>
+        </select>
+      </div>
       <div class="batch-section" id="batchSection" style="display:none">
         <div class="batch-header"><span class="icon">📋</span> 批量添加子部门</div>
         <textarea id="batchNames" placeholder="每行输入一个部门名称，如：&#10;前端组&#10;后端组&#10;测试组"></textarea>
@@ -631,6 +726,45 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
+<!-- Auth Modal -->
+<div class="modal-overlay" id="authModalOverlay" style="display:none">
+  <div class="modal">
+    <h2 id="authModalTitle">登录账号</h2>
+    <div class="auth-switch">
+      <button class="btn btn-primary btn-sm" id="loginTab" onclick="setAuthMode('login')">登录</button>
+      <button class="btn btn-outline btn-sm" id="registerTab" onclick="setAuthMode('register')">注册</button>
+    </div>
+    <div class="form-group">
+      <label>账号</label>
+      <input type="text" id="authUsername" autocomplete="username" placeholder="请输入账号">
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" id="authPassword" autocomplete="current-password" placeholder="请输入密码">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeAuthModal()">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="submitAuth()" id="authSubmitBtn">登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image OCR Modal -->
+<div class="modal-overlay" id="ocrModalOverlay" style="display:none">
+  <div class="modal ocr-modal">
+    <h2>图片识别导入</h2>
+    <div class="ocr-progress" id="ocrProgress">识别结果可在导入前手动修正。</div>
+    <textarea id="ocrText" class="ocr-textarea" placeholder="识别出的部门层级会显示在这里"></textarea>
+    <div class="ocr-hint">识别后会按图片中的节点位置生成缩进层级，可在这里删改错字或调整层级后再导入。</div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeOcrModal()">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="applyOcrImport()">导入为组织架构</button>
+    </div>
+  </div>
+</div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
     // ============ DATA MODEL ============
     let orgData = null;
@@ -638,13 +772,18 @@
     let contextNodeId = null;
     let editingNodeId = null; // null = creating new root, string = editing existing
     let editingParentId = null; // parent for new node
-    let currentLayout = 'tree'; // tree | left
+    let currentLayout = 'tree'; // unused now, kept for compat; each node uses _layout
     let zoomLevel = 1;
     let nodeElements = new Map();
     let panX = 0, panY = 0;
     let isPanning = false;
     let startPanX = 0, startPanY = 0;
     let startMouseX = 0, startMouseY = 0;
+
+    // Undo/Redo
+    let undoStack = [];
+    let redoStack = [];
+    const MAX_UNDO = 50;
 
     // Display settings
     let displaySettings = {
@@ -654,6 +793,9 @@
 
     // Drag state
     let dragNodeId = null;
+    let isDraggingNode = false;
+    let dragStartX = 0;
+    let nodeStartX = 0;
 
     const defaultData = {
       id: 'root',
@@ -661,49 +803,50 @@
       manager: '',
       count: 0,
       color: 'blue',
+      _layout: 'tree',
       children: [
         {
-          id: 'dept-1', name: '交付运营部', manager: '王瀚驰', count: 45, color: 'blue',
+          id: 'dept-1', name: '交付运营部', manager: '王瀚驰', count: 45, color: 'blue', _layout: 'tree',
           children: [
-            { id: 'dept-1-1', name: '运营一组', manager: '李明', count: 15, color: 'blue', children: [] },
-            { id: 'dept-1-2', name: '运营二组', manager: '王芳', count: 18, color: 'blue', children: [] },
-            { id: 'dept-1-3', name: '质量管理组', manager: '赵刚', count: 12, color: 'blue', children: [] },
+            { id: 'dept-1-1', name: '运营一组', manager: '李明', count: 15, color: 'blue', _layout: 'tree', children: [] },
+            { id: 'dept-1-2', name: '运营二组', manager: '王芳', count: 18, color: 'blue', _layout: 'tree', children: [] },
+            { id: 'dept-1-3', name: '质量管理组', manager: '赵刚', count: 12, color: 'blue', _layout: 'tree', children: [] },
           ]
         },
         {
-          id: 'dept-2', name: '销售客服部', manager: '陈思华', count: 32, color: 'blue',
+          id: 'dept-2', name: '销售客服部', manager: '陈思华', count: 32, color: 'blue', _layout: 'tree',
           children: [
-            { id: 'dept-2-1', name: '销售组', manager: '刘洋', count: 18, color: 'blue', children: [] },
-            { id: 'dept-2-2', name: '客服组', manager: '周敏', count: 14, color: 'blue', children: [] },
+            { id: 'dept-2-1', name: '销售组', manager: '刘洋', count: 18, color: 'blue', _layout: 'tree', children: [] },
+            { id: 'dept-2-2', name: '客服组', manager: '周敏', count: 14, color: 'blue', _layout: 'tree', children: [] },
           ]
         },
         {
-          id: 'dept-3', name: '经营管理部', manager: '黄雪香', count: 20, color: 'blue',
+          id: 'dept-3', name: '经营管理部', manager: '黄雪香', count: 20, color: 'blue', _layout: 'tree',
           children: [
-            { id: 'dept-3-1', name: '经营分析组', manager: '吴强', count: 10, color: 'blue', children: [] },
-            { id: 'dept-3-2', name: '战略规划组', manager: '郑丽', count: 10, color: 'blue', children: [] },
+            { id: 'dept-3-1', name: '经营分析组', manager: '吴强', count: 10, color: 'blue', _layout: 'tree', children: [] },
+            { id: 'dept-3-2', name: '战略规划组', manager: '郑丽', count: 10, color: 'blue', _layout: 'tree', children: [] },
           ]
         },
         {
-          id: 'dept-4', name: '技术部', manager: '李章勇', count: 38, color: 'green',
+          id: 'dept-4', name: '技术部', manager: '李章勇', count: 38, color: 'green', _layout: 'tree',
           children: [
-            { id: 'dept-4-1', name: '前端组', manager: '孙伟', count: 12, color: 'green', children: [] },
-            { id: 'dept-4-2', name: '后端组', manager: '钱多', count: 15, color: 'green', children: [] },
-            { id: 'dept-4-3', name: '测试组', manager: '韩雪', count: 11, color: 'green', children: [] },
+            { id: 'dept-4-1', name: '前端组', manager: '孙伟', count: 12, color: 'green', _layout: 'tree', children: [] },
+            { id: 'dept-4-2', name: '后端组', manager: '钱多', count: 15, color: 'green', _layout: 'tree', children: [] },
+            { id: 'dept-4-3', name: '测试组', manager: '韩雪', count: 11, color: 'green', _layout: 'tree', children: [] },
           ]
         },
         {
-          id: 'dept-5', name: '人力行政部', manager: '刘永龙', count: 16, color: 'purple',
+          id: 'dept-5', name: '人力行政部', manager: '刘永龙', count: 16, color: 'purple', _layout: 'tree',
           children: [
-            { id: 'dept-5-1', name: '招聘组', manager: '冯丽', count: 8, color: 'purple', children: [] },
-            { id: 'dept-5-2', name: '行政组', manager: '陈磊', count: 8, color: 'purple', children: [] },
+            { id: 'dept-5-1', name: '招聘组', manager: '冯丽', count: 8, color: 'purple', _layout: 'tree', children: [] },
+            { id: 'dept-5-2', name: '行政组', manager: '陈磊', count: 8, color: 'purple', _layout: 'tree', children: [] },
           ]
         },
         {
-          id: 'dept-6', name: '财务部', manager: '王旭', count: 12, color: 'orange',
+          id: 'dept-6', name: '财务部', manager: '王旭', count: 12, color: 'orange', _layout: 'tree',
           children: [
-            { id: 'dept-6-1', name: '核算组', manager: '林燕', count: 6, color: 'orange', children: [] },
-            { id: 'dept-6-2', name: '预算组', manager: '杨峰', count: 6, color: 'orange', children: [] },
+            { id: 'dept-6-1', name: '核算组', manager: '林燕', count: 6, color: 'orange', _layout: 'tree', children: [] },
+            { id: 'dept-6-2', name: '预算组', manager: '杨峰', count: 6, color: 'orange', _layout: 'tree', children: [] },
           ]
         },
       ]
@@ -716,6 +859,41 @@
     // Deep clone data
     function cloneData(data) {
       return JSON.parse(JSON.stringify(data));
+    }
+
+    // ============ UNDO / REDO ============
+    function pushUndo() {
+      undoStack.push(cloneData(orgData));
+      redoStack = [];
+      if (undoStack.length > MAX_UNDO) undoStack.shift();
+      updateUndoButtons();
+    }
+
+    function undo() {
+      if (undoStack.length === 0) return;
+      redoStack.push(cloneData(orgData));
+      orgData = undoStack.pop();
+      selectedNodeId = null;
+      render();
+      setTimeout(fitToScreen, 100);
+      updateUndoButtons();
+      showToast('已撤销 ↩', 'info');
+    }
+
+    function redo() {
+      if (redoStack.length === 0) return;
+      undoStack.push(cloneData(orgData));
+      orgData = redoStack.pop();
+      selectedNodeId = null;
+      render();
+      setTimeout(fitToScreen, 100);
+      updateUndoButtons();
+      showToast('已重做 ↪', 'info');
+    }
+
+    function updateUndoButtons() {
+      document.getElementById('btnUndo').disabled = (undoStack.length === 0);
+      document.getElementById('btnRedo').disabled = (redoStack.length === 0);
     }
 
     // Find node by id
@@ -774,96 +952,129 @@
 
     function resetToDefault() {
       if (confirm('确定要重置为默认示例数据吗？当前修改将丢失。')) {
+        pushUndo();
         orgData = cloneData(defaultData);
         idCounter = 200;
         selectedNodeId = null;
+        undoStack = []; redoStack = []; updateUndoButtons();
         render();
         showToast('已重置为默认数据', 'success');
       }
     }
 
-    // ============ LAYOUT CALCULATION ============
-    const NODE_WIDTH = 170;
-    const NODE_HEIGHT = 80;
-    const H_GAP = 40;
-    const V_GAP = 80;
-    const LEFT_H_GAP = 240;
-    const LEFT_V_GAP = 50;
+    // ============ UNIFIED LAYOUT ENGINE ============
+    // Clean two-pass algorithm:
+    //   Pass 1: computeMetrics → each node's full subtree bounding box (_w, _h)
+    //   Pass 2: positionNode   → assign exact (x,y) using parent's allocated space
+    //
+    // Key principle: tree layout allocates space for each child based on its _w,
+    // so left/right children's lateral extension must be included in _w.
 
-    function calcTreeLayout(data, depth = 0, xOffset = 0) {
-      if (!data) return { x: 0, y: 0, totalWidth: 0 };
-      
-      const children = data.children || [];
-      
+    const NODE_WIDTH = 140;  // slightly smaller for tighter packing
+    const NODE_HEIGHT = 70;
+    const H_GAP = 24;        // horizontal gap between sibling subtrees
+    const V_GAP = 50;        // vertical gap between parent and children row
+    const SIDE_H_GAP = 60;   // horizontal gap for left/right
+    const SIDE_V_GAP = 12;   // vertical gap between stacked children
+
+    // ── PASS 1: bottom-up subtree bounding box ──
+    // _w: total width this subtree occupies, centered at parent's allocation
+    // _h: total height this subtree occupies
+    function computeMetrics(node) {
+      const children = node.children || [];
+      children.forEach(c => computeMetrics(c));
+
+      const layout = node._layout || 'tree';
+
       if (children.length === 0) {
-        data._x = xOffset + NODE_WIDTH / 2;
-        data._y = depth * (NODE_HEIGHT + V_GAP);
-        data._depth = depth;
-        return { x: data._x, y: data._y, totalWidth: NODE_WIDTH };
+        node._w = NODE_WIDTH;
+        node._h = NODE_HEIGHT;
+        return;
       }
 
-      let totalWidth = 0;
-      let childOffsets = [];
-      let currentX = xOffset;
-
-      for (const child of children) {
-        const result = calcTreeLayout(child, depth + 1, currentX);
-        childOffsets.push({ child, result });
-        currentX += result.totalWidth + H_GAP;
-        totalWidth += result.totalWidth;
+      if (layout === 'tree') {
+        // Children side by side: width sums, height = max child + gap
+        const hg = H_GAP, vg = V_GAP;
+        const childrenW = children.reduce((s, c) => s + c._w, 0) + (children.length - 1) * hg;
+        node._w = Math.max(NODE_WIDTH, childrenW);
+        node._h = NODE_HEIGHT + vg + Math.max(...children.map(c => c._h));
+      } else {
+        const shg = SIDE_H_GAP, svg = SIDE_V_GAP;
+        const maxChildW = Math.max(...children.map(c => c._w));
+        const extension = shg + maxChildW;
+        node._w = Math.max(NODE_WIDTH, extension * 2);
+        const childrenH = children.reduce((s, c) => s + c._h, 0) + (children.length - 1) * svg;
+        node._h = NODE_HEIGHT + childrenH;
       }
-      totalWidth += Math.max(0, (children.length - 1) * H_GAP);
-
-      const firstChild = children[0];
-      const lastChild = children[children.length - 1];
-      data._x = (firstChild._x + lastChild._x) / 2;
-      data._y = depth * (NODE_HEIGHT + V_GAP);
-      data._depth = depth;
-
-      // Ensure minimum width
-      if (totalWidth < NODE_WIDTH) totalWidth = NODE_WIDTH;
-
-      return { x: data._x, y: data._y, totalWidth };
     }
 
-    function calcLeftLayout(data, depth = 0, accY = 0) {
-      if (!data) return { totalHeight: 0 };
-      
-      const children = data.children || [];
-      
-      if (children.length === 0) {
-        data._x = depth * LEFT_H_GAP;
-        data._y = accY;
-        data._depth = depth;
-        return { totalHeight: NODE_HEIGHT + LEFT_V_GAP };
+    // ── PASS 2: top-down positioning ──
+    // Parent is allocated a rectangle [cx - _w/2, cx + _w/2] × [cy, cy + _h]
+    // (x,y) is top-left corner of the node card
+    function positionNode(node, cx, cy, depth = 0) {
+      // cx is parent's center-x allocation for this subtree
+      // Position this node's card centered in that allocation
+      node._x = cx - NODE_WIDTH / 2;
+      node._y = cy;
+      node._depth = depth;
+
+      const children = node.children || [];
+      if (children.length === 0) return;
+
+      const layout = node._layout || 'tree';
+
+      if (layout === 'tree') {
+        // Children in a row below, each child centered in its allocated _w slice
+        const vg = V_GAP, hg = H_GAP;
+        const childY = cy + NODE_HEIGHT + vg;
+        const totalChildrenW = children.reduce((s, c) => s + c._w, 0) + (children.length - 1) * hg;
+        const startX = cx - totalChildrenW / 2;
+        let curX = startX;
+        children.forEach(c => {
+          positionNode(c, curX + c._w / 2, childY, depth + 1);
+          curX += c._w + hg;
+        });
+      } else if (layout === 'left') {
+        // Children BELOW parent, column to the RIGHT of a vertical trunk
+        const shg = SIDE_H_GAP, svg = SIDE_V_GAP;
+        const childX = cx + shg;
+        let curY = cy + NODE_HEIGHT; // below parent
+        children.forEach(c => {
+          positionNode(c, childX + c._w / 2, curY, depth + 1);
+          curY += c._h + svg;
+        });
+      } else {  // right
+        // Children BELOW parent, column to the LEFT of a vertical trunk
+        const shg = SIDE_H_GAP, svg = SIDE_V_GAP;
+        const childRightX = cx - shg;
+        let curY = cy + NODE_HEIGHT; // below parent
+        children.forEach(c => {
+          positionNode(c, childRightX - c._w / 2, curY, depth + 1);
+          curY += c._h + svg;
+        });
       }
-
-      let currentY = accY;
-      let totalHeight = 0;
-      let childYOffsets = [];
-
-      for (const child of children) {
-        const result = calcLeftLayout(child, depth + 1, currentY);
-        childYOffsets.push({ child, y: currentY });
-        currentY += result.totalHeight;
-        totalHeight += result.totalHeight;
-      }
-
-      const firstChildY = children[0]._y;
-      const lastChildY = children[children.length - 1]._y;
-      data._x = depth * LEFT_H_GAP;
-      data._y = (firstChildY + lastChildY) / 2;
-      data._depth = depth;
-
-      return { totalHeight };
     }
 
     function relayout() {
-      if (currentLayout === 'tree') {
-        calcTreeLayout(orgData);
-      } else {
-        calcLeftLayout(orgData);
-      }
+      // Pass 1: metrics
+      computeMetrics(orgData);
+      // Pass 2: position from root
+      // Root centered horizontally, starts at y=0 (padding added later)
+      positionNode(orgData, orgData._w / 2, 0, 0);
+      // Add padding
+      shiftAllNodes(orgData, 60, 60);
+    }
+
+    function shiftAllNodes(node, dx, dy) {
+      node._x += dx;
+      node._y += dy;
+      for (const c of node.children || []) shiftAllNodes(c, dx, dy);
+    }
+
+    function shiftOffsets(node, dx) {
+      node._offsetX = (node._offsetX || 0) + dx;
+      node._offsetY = node._offsetY || 0; // keep Y locked
+      for (const c of node.children || []) shiftOffsets(c, dx);
     }
 
     // ============ RENDERING ============
@@ -890,8 +1101,9 @@
       // Calculate canvas size
       let maxX = 0, maxY = 0;
       allNodes.forEach(n => {
-        maxX = Math.max(maxX, (n._x || 0) + NODE_WIDTH + 60);
-        maxY = Math.max(maxY, (n._y || 0) + NODE_HEIGHT + 60);
+        const ox = n._offsetX || 0, oy = n._offsetY || 0;
+        maxX = Math.max(maxX, (n._x || 0) + ox + NODE_WIDTH + 60);
+        maxY = Math.max(maxY, (n._y || 0) + oy + NODE_HEIGHT + 60);
       });
 
       // Update SVG size
@@ -902,30 +1114,55 @@
       // Draw lines
       function drawLines(data) {
         const children = data.children || [];
-        for (const child of children) {
-          // Parent center-bottom -> Child center-top
-          const pCenterX = (data._x || 0) + NODE_WIDTH / 2;
-          const pCenterY = (data._y || 0) + NODE_HEIGHT;
-          const cCenterX = (child._x || 0) + NODE_WIDTH / 2;
-          const cCenterY = child._y || 0;
+        if (children.length === 0) return;
+        
+        const parentLayout = data._layout || 'tree';
+        const pox = data._offsetX || 0, poy = data._offsetY || 0;
 
-          if (currentLayout === 'tree') {
-            // Tree layout: vertical from parent bottom-center, then horizontal to child center, then down to child top-center
+        if (parentLayout === 'tree') {
+          for (const child of children) {
+            const cox = child._offsetX || 0, coy = child._offsetY || 0;
+            const pCenterX = (data._x || 0) + pox + NODE_WIDTH / 2;
+            const pCenterY = (data._y || 0) + poy + NODE_HEIGHT;
+            const cCenterX = (child._x || 0) + cox + NODE_WIDTH / 2;
+            const cCenterY = (child._y || 0) + coy;
             const midY = pCenterY + (cCenterY - pCenterY) / 2;
             const path = `M ${pCenterX} ${pCenterY} L ${pCenterX} ${midY} L ${cCenterX} ${midY} L ${cCenterX} ${cCenterY}`;
             svg.innerHTML += `<path d="${path}" opacity="0.4"/>`;
-          } else {
-            // Left layout: horizontal from parent right-center, then to child left-center
-            const midX = pCenterX + (cCenterX - pCenterX) / 2;
-            const pRightX = (data._x || 0) + NODE_WIDTH;
-            const pMidY = (data._y || 0) + NODE_HEIGHT / 2;
-            const cMidY = (child._y || 0) + NODE_HEIGHT / 2;
-            const path = `M ${pRightX} ${pMidY} L ${midX} ${pMidY} L ${midX} ${cMidY} L ${cCenterX - NODE_WIDTH/2} ${cMidY}`;
-            svg.innerHTML += `<path d="${path}" opacity="0.4"/>`;
           }
-          
-          drawLines(child);
+        } else if (parentLayout === 'left') {
+          // Trunk: vertical line from parent bottom down to last child
+          const pCenterX = (data._x || 0) + pox + NODE_WIDTH / 2;
+          const pBottomY = (data._y || 0) + poy + NODE_HEIGHT;
+          const lastChild = children[children.length - 1];
+          const lastCY = (lastChild._y || 0) + (lastChild._offsetY || 0) + NODE_HEIGHT / 2;
+          const trunk = `M ${pCenterX} ${pBottomY} L ${pCenterX} ${lastCY}`;
+          svg.innerHTML += `<path d="${trunk}" opacity="0.4"/>`;
+          for (const child of children) {
+            const cox = child._offsetX || 0, coy = child._offsetY || 0;
+            const cLeftX = (child._x || 0) + cox;
+            const cMidY = (child._y || 0) + coy + NODE_HEIGHT / 2;
+            const branch = `M ${pCenterX} ${cMidY} L ${cLeftX} ${cMidY}`;
+            svg.innerHTML += `<path d="${branch}" opacity="0.4"/>`;
+          }
+        } else {
+          // Right layout: trunk down, branches to the left
+          const pCenterX = (data._x || 0) + pox + NODE_WIDTH / 2;
+          const pBottomY = (data._y || 0) + poy + NODE_HEIGHT;
+          const lastChild = children[children.length - 1];
+          const lastCY = (lastChild._y || 0) + (lastChild._offsetY || 0) + NODE_HEIGHT / 2;
+          const trunk = `M ${pCenterX} ${pBottomY} L ${pCenterX} ${lastCY}`;
+          svg.innerHTML += `<path d="${trunk}" opacity="0.4"/>`;
+          for (const child of children) {
+            const cox = child._offsetX || 0, coy = child._offsetY || 0;
+            const cRightX = (child._x || 0) + cox + NODE_WIDTH;
+            const cMidY = (child._y || 0) + coy + NODE_HEIGHT / 2;
+            const branch = `M ${pCenterX} ${cMidY} L ${cRightX} ${cMidY}`;
+            svg.innerHTML += `<path d="${branch}" opacity="0.4"/>`;
+          }
         }
+        
+        for (const child of children) drawLines(child);
       }
       drawLines(orgData);
 
@@ -947,8 +1184,10 @@
       const el = document.createElement('div');
       el.className = 'org-node';
       el.id = 'node-el-' + node.id;
-      el.style.left = (node._x || 0) + 'px';
-      el.style.top = (node._y || 0) + 'px';
+      const ox = node._offsetX || 0;
+      const oy = node._offsetY || 0;
+      el.style.left = ((node._x || 0) + ox) + 'px';
+      el.style.top = ((node._y || 0) + oy) + 'px';
       el.dataset.depth = node._depth || 0;
       el.dataset.color = node.color || 'blue';
 
@@ -1000,9 +1239,17 @@
       el.draggable = true;
 
       // Events
-      el.addEventListener('click', (e) => {
+      el.addEventListener('mousedown', (e) => {
         e.stopPropagation();
         selectNode(node.id);
+
+        // Start drag-to-move if this node is selected
+        if (selectedNodeId === node.id && e.button === 0) {
+          isDraggingNode = true;
+          dragStartX = e.clientX;
+          nodeStartX = node._offsetX || 0;
+          el.style.cursor = 'ew-resize';
+        }
       });
 
       el.addEventListener('dblclick', (e) => {
@@ -1119,7 +1366,7 @@
       if (!node) return;
       editingNodeId = id;
       editingParentId = null;
-      openModal('编辑部门', { name: node.name, manager: node.manager || '', count: node.count || 0, color: node.color || 'blue' });
+      openModal('编辑部门', { name: node.name, manager: node.manager || '', count: node.count || 0, color: node.color || 'blue', _layout: node._layout || 'tree' });
     }
 
     function editSelected() {
@@ -1145,6 +1392,7 @@
         return;
       }
 
+      pushUndo();
       deleteNode(orgData, id);
       if (selectedNodeId === id) selectedNodeId = null;
       render();
@@ -1164,6 +1412,8 @@
       if (!node) return;
       const parent = findParent(orgData, id);
       if (!parent) return;
+
+      pushUndo();
 
       const cloned = cloneData(node);
       cloned.id = generateId();
@@ -1214,6 +1464,8 @@
         showToast('无法移动根节点', 'error');
         return;
       }
+
+      pushUndo();
 
       // If target is root, move as child of root
       if (targetId === orgData.id) {
@@ -1275,120 +1527,275 @@
       }
     });
 
-    // ============ HISTORY ============
-    const HISTORY_KEY = 'org-chart-history';
-    const MAX_HISTORY = 30;
 
-    function getHistory() {
-      try {
-        return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-      } catch(e) { return []; }
-    }
+// ============ ACCOUNT + DATABASE HISTORY ============
+const HISTORY_KEY = 'org-chart-history';
+const MAX_HISTORY = 30;
+const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:8765' : window.location.origin;
+let authMode = 'login';
+let authToken = localStorage.getItem('org-chart-auth-token') || '';
+let currentUser = null;
 
-    function saveToHistory() {
-      const history = getHistory();
-      const rootName = orgData?.name || '未命名';
-      const now = new Date();
-      const ts = now.toLocaleString('zh-CN');
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
 
-      history.unshift({
-        id: Date.now().toString(),
-        name: rootName,
-        time: ts,
-        data: JSON.parse(JSON.stringify(orgData))
+async function apiRequest(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  if (authToken) headers.Authorization = 'Bearer ' + authToken;
+  const res = await fetch(API_BASE + path, { ...options, headers });
+  let body = {};
+  try { body = await res.json(); } catch(e) {}
+  if (!res.ok) throw new Error(body.error || '请求失败');
+  return body;
+}
+
+async function initAuth() {
+  if (!authToken) {
+    renderAuthState();
+    return;
+  }
+  try {
+    const data = await apiRequest('/api/me');
+    currentUser = data.user;
+  } catch(e) {
+    authToken = '';
+    localStorage.removeItem('org-chart-auth-token');
+  }
+  renderAuthState();
+}
+
+function renderAuthState() {
+  const status = document.getElementById('authStatusText');
+  const authButton = document.getElementById('authButton');
+  const logoutButton = document.getElementById('logoutButton');
+  const hint = document.getElementById('historyAccountHint');
+  const signedIn = !!currentUser;
+
+  if (status) {
+    status.textContent = signedIn ? currentUser.username : '未登录';
+    status.classList.toggle('signed-in', signedIn);
+  }
+  if (authButton) {
+    authButton.textContent = signedIn ? '切换账号' : '登录 / 注册';
+  }
+  if (logoutButton) logoutButton.style.display = signedIn ? 'inline-flex' : 'none';
+  if (hint) hint.textContent = signedIn ? '历史记录保存在本机 SQLite 数据库，并按账号隔离' : '登录后历史会保存到本机 SQLite 数据库';
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  document.getElementById('authModalTitle').textContent = mode === 'login' ? '登录账号' : '注册账号';
+  document.getElementById('authSubmitBtn').textContent = mode === 'login' ? '登录' : '注册并登录';
+  document.getElementById('loginTab').className = mode === 'login' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+  document.getElementById('registerTab').className = mode === 'register' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+}
+
+function openAuthModal(mode = 'login') {
+  setAuthMode(mode);
+  document.getElementById('authUsername').value = currentUser?.username || '';
+  document.getElementById('authPassword').value = '';
+  document.getElementById('authModalOverlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('authUsername').focus(), 30);
+}
+
+function closeAuthModal() {
+  document.getElementById('authModalOverlay').style.display = 'none';
+}
+
+async function submitAuth() {
+  const username = document.getElementById('authUsername').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if (!username || !password) {
+    showToast('请输入账号和密码', 'error');
+    return;
+  }
+  try {
+    const data = await apiRequest('/api/' + authMode, {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem('org-chart-auth-token', authToken);
+    closeAuthModal();
+    renderAuthState();
+    renderHistoryList();
+    showToast(authMode === 'login' ? '登录成功' : '注册成功', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function logout() {
+  authToken = '';
+  currentUser = null;
+  localStorage.removeItem('org-chart-auth-token');
+  renderAuthState();
+  renderHistoryList();
+  showToast('已退出账号', 'success');
+}
+
+async function getHistory() {
+  if (!currentUser) return [];
+  const data = await apiRequest('/api/history');
+  return data.history || [];
+}
+
+async function saveToHistory(options = {}) {
+  if (!currentUser) {
+    openAuthModal('login');
+    showToast('请先登录账号', 'error');
+    return false;
+  }
+  const rootName = orgData?.name || '未命名';
+  const data = await apiRequest('/api/history', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: rootName,
+      data: JSON.parse(JSON.stringify(orgData))
+    })
+  });
+  await renderHistoryList();
+  if (!options.silent) showToast('已保存到数据库历史', 'success');
+  return data.item;
+}
+
+async function loadHistory(id) {
+  const history = await getHistory();
+  const item = history.find(h => h.id === id);
+  if (!item || !confirm(`确定要加载"${item.name}"（${item.time}）吗？当前修改将丢失。`)) return;
+
+  pushUndo();
+  orgData = normalizeImportedData(JSON.parse(JSON.stringify(item.data)));
+  refreshIdCounter(orgData);
+  selectedNodeId = null;
+  undoStack = []; redoStack = []; updateUndoButtons();
+  render();
+  document.getElementById('historyDropdown').classList.remove('show');
+  showToast('已加载历史版本', 'success');
+}
+
+async function deleteHistory(id) {
+  const history = await getHistory();
+  const idx = history.findIndex(h => h.id === id);
+  if (idx < 0) return;
+  const name = history[idx].name;
+  if (!confirm(`确定删除"${name}"吗？`)) return;
+
+  await apiRequest('/api/history/' + encodeURIComponent(id), { method: 'DELETE' });
+  await renderHistoryList();
+  showToast('已删除', 'success');
+}
+
+
+function getLegacyLocalHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(item => item && item.data && item.name) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+async function recoverLegacyHistory() {
+  const legacy = getLegacyLocalHistory();
+  if (legacy.length === 0) {
+    const message = window.location.protocol === 'file:'
+      ? '当前本地文件来源没有找到旧历史记录'
+      : '旧历史通常保存在 file:/// 打开的页面里。请用本地文件方式打开 index.html，登录后再点“恢复旧历史”。';
+    alert(message);
+    return;
+  }
+
+  if (!currentUser) {
+    openAuthModal('login');
+    showToast('请先登录账号，再恢复旧历史', 'error');
+    return;
+  }
+
+  if (!confirm(`找到 ${legacy.length} 条旧本机历史，要导入到当前账号数据库吗？`)) return;
+
+  let imported = 0;
+  for (const item of legacy.slice().reverse()) {
+    try {
+      await apiRequest('/api/history', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: item.name || '旧历史记录',
+          data: item.data
+        })
       });
-
-      // Trim
-      if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
-
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-      renderHistoryList();
-      showToast('已保存到历史', 'success');
+      imported++;
+    } catch (e) {
+      console.warn('旧历史导入失败：', item, e);
     }
+  }
+  await renderHistoryList();
+  showToast(`已恢复 ${imported} 条旧历史`, imported > 0 ? 'success' : 'error');
+}
 
-    function loadHistory(id) {
-      const history = getHistory();
-      const item = history.find(h => h.id === id);
-      if (!item || !confirm(`确定要加载"${item.name}"（${item.time}）吗？当前修改将丢失。`)) return;
+async function exportAllHistory() {
+  const history = await getHistory();
+  if (history.length === 0) {
+    showToast(currentUser ? '历史记录为空' : '请先登录账号', 'error');
+    return;
+  }
+  const json = JSON.stringify(history, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '组织架构图_历史_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`已导出 ${history.length} 条历史`, 'success');
+}
 
-      orgData = JSON.parse(JSON.stringify(item.data));
-      selectedNodeId = null;
-      render();
-      document.getElementById('historyDropdown').classList.remove('show');
-      showToast('已加载历史版本', 'success');
+async function toggleHistory() {
+  const dd = document.getElementById('historyDropdown');
+  dd.classList.toggle('show');
+  if (dd.classList.contains('show')) await renderHistoryList();
+}
+
+async function renderHistoryList() {
+  const container = document.getElementById('historyList');
+  if (!container) return;
+  if (!currentUser) {
+    container.innerHTML = '<div class="history-empty">请先登录账号</div>';
+    return;
+  }
+  try {
+    const history = await getHistory();
+    if (history.length === 0) {
+      container.innerHTML = '<div class="history-empty">暂无历史记录</div>';
+      return;
     }
+    container.innerHTML = history.map(h => `
+      <div class="history-item" onclick="loadHistory('${escapeHtml(h.id)}')">
+        <span class="hi-name" title="${escapeHtml(h.name)}">${escapeHtml(h.name)}</span>
+        <span class="hi-time">${escapeHtml(h.time)}</span>
+        <span class="hi-del" onclick="event.stopPropagation();deleteHistory('${escapeHtml(h.id)}')" title="删除">×</span>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="history-empty">历史读取失败</div>';
+  }
+}
 
-    function deleteHistory(id) {
-      const history = getHistory();
-      const idx = history.findIndex(h => h.id === id);
-      if (idx < 0) return;
-      const name = history[idx].name;
-      if (!confirm(`确定删除"${name}"吗？`)) return;
-
-      history.splice(idx, 1);
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-      renderHistoryList();
-      showToast('已删除', 'success');
-    }
-
-    function exportAllHistory() {
-      const history = getHistory();
-      if (history.length === 0) {
-        showToast('历史记录为空', 'error');
-        return;
-      }
-      const json = JSON.stringify(history, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = '组织架构图_历史_' + new Date().toISOString().slice(0, 10) + '.json';
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast(`已导出 ${history.length} 条历史`, 'success');
-    }
-
-    function toggleHistory() {
-      const dd = document.getElementById('historyDropdown');
-      dd.classList.toggle('show');
-      if (dd.classList.contains('show')) {
-        renderHistoryList();
-      }
-    }
-
-    function renderHistoryList() {
-      const container = document.getElementById('historyList');
-      const history = getHistory();
-      if (history.length === 0) {
-        container.innerHTML = '<div class="history-empty">暂无历史记录</div>';
-        return;
-      }
-      container.innerHTML = history.map(h => `
-        <div class="history-item" onclick="loadHistory('${h.id}')">
-          <span class="hi-name" title="${h.name}">${h.name}</span>
-          <span class="hi-time">${h.time}</span>
-          <span class="hi-del" onclick="event.stopPropagation();deleteHistory('${h.id}')" title="删除">×</span>
-        </div>
-      `).join('');
-    }
-
-    // Update history on JSON export
-    const origExportJSON2 = exportJSON;
-    exportJSON = function() {
-      // also save to history
-      const history = getHistory();
-      const rootName = orgData?.name || '未命名';
-      history.unshift({
-        id: Date.now().toString(),
-        name: rootName,
-        time: new Date().toLocaleString('zh-CN'),
-        data: JSON.parse(JSON.stringify(orgData))
-      });
-      if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-      // call original
-      origExportJSON2();
-    };
+// Update history on JSON export
+const origExportJSON2 = exportJSON;
+exportJSON = async function() {
+  try {
+    if (currentUser) await saveToHistory({ silent: true });
+  } catch(e) {
+    showToast('数据库历史保存失败，但会继续导出 JSON', 'error');
+  }
+  origExportJSON2();
+};
 
     // ============ MODAL ============
     function openModal(title, data) {
@@ -1397,6 +1804,7 @@
       document.getElementById('editManager').value = data.manager;
       document.getElementById('editCount').value = data.count;
       document.getElementById('editColor').value = data.color;
+      document.getElementById('editLayout').value = data._layout || 'tree';
       // Show batch section only when adding children (not editing existing node)
       const isAddMode = !editingNodeId;  // adding new nodes => show batch
       document.getElementById('batchSection').style.display = isAddMode ? 'block' : 'none';
@@ -1416,6 +1824,7 @@
       const manager = document.getElementById('editManager').value.trim();
       const count = parseInt(document.getElementById('editCount').value) || 0;
       const color = document.getElementById('editColor').value;
+      const layout = document.getElementById('editLayout').value;
       const batchText = document.getElementById('batchNames').value.trim();
 
       // Batch mode: multiple child departments
@@ -1427,13 +1836,14 @@
         }
 
         const targetParent = editingNodeId 
-          ? findNode(orgData, editingNodeId)     // adding to selected node
+          ? findNode(orgData, editingNodeId)
           : (editingParentId 
-              ? findNode(orgData, editingParentId) // adding to parent
-              : orgData);                          // adding to root
+              ? findNode(orgData, editingParentId)
+              : orgData);
 
         if (!targetParent) return;
 
+        pushUndo();
         lines.forEach(lineName => {
           targetParent.children.push({
             id: generateId(),
@@ -1441,6 +1851,7 @@
             manager: '',
             count: 0,
             color: color,
+            _layout: 'tree',
             children: []
           });
         });
@@ -1457,6 +1868,8 @@
         return;
       }
 
+      pushUndo();
+
       if (editingNodeId) {
         // Edit existing
         const node = findNode(orgData, editingNodeId);
@@ -1465,6 +1878,7 @@
           node.manager = manager;
           node.count = count;
           node.color = color;
+          node._layout = layout;
         }
       } else if (editingParentId) {
         // Add child to parent
@@ -1476,6 +1890,7 @@
             manager,
             count,
             color,
+            _layout: layout,
             children: []
           };
           parent.children.push(newNode);
@@ -1489,6 +1904,7 @@
             manager,
             count,
             color,
+            _layout: layout,
             children: []
           };
           orgData.children.push(newNode);
@@ -1534,12 +1950,490 @@
       hideContextMenu();
     }
 
-    // ============ IMPORT / EXPORT ============
+
+
+// ============ IMAGE OCR IMPORT ============
+let ocrParsedTree = null;
+let ocrPreviewText = '';
+
+function normalizeImportedData(node, depth = 0) {
+  if (!node || typeof node !== 'object') throw new Error('无效的组织架构数据');
+  node.id = node.id || generateId();
+  node.name = String(node.name || '未命名').trim();
+  node.manager = node.manager || '';
+  node.count = parseInt(node.count) || 0;
+  node.color = node.color || 'blue';
+  node._layout = node._layout || 'tree';
+  node.children = Array.isArray(node.children) ? node.children : [];
+  node.children.forEach(child => normalizeImportedData(child, depth + 1));
+  return node;
+}
+
+function refreshIdCounter(data) {
+  let maxId = 0;
+  function scan(n) {
+    const match = String(n.id || '').match(/node-(\d+)/);
+    if (match && parseInt(match[1]) > maxId) maxId = parseInt(match[1]);
+    for (const child of n.children || []) scan(child);
+  }
+  scan(data);
+  idCounter = Math.max(idCounter, maxId + 1);
+}
+
+function cleanOcrLine(line) {
+  return String(line || '')
+    .replace(/[|│]+/g, ' ')
+    .replace(/[└├─—]+/g, ' ')
+    .replace(/^[\s\d.、\-+*]+/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function createOcrNode(name) {
+  return { id: generateId(), name: cleanOcrLine(name) || '未命名', manager: '', count: 0, color: 'blue', _layout: 'tree', children: [] };
+}
+
+function median(values, fallback = 0) {
+  const nums = values.filter(v => Number.isFinite(v)).sort((a, b) => a - b);
+  if (!nums.length) return fallback;
+  const mid = Math.floor(nums.length / 2);
+  return nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+}
+
+function overlapAmount(a0, a1, b0, b1) {
+  return Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+}
+
+function joinOcrWords(words) {
+  let out = '';
+  for (const word of words) {
+    const text = cleanOcrLine(word.text);
+    if (!text) continue;
+    const needSpace = out && /[A-Za-z0-9]$/.test(out) && /^[A-Za-z0-9]/.test(text);
+    out += (needSpace ? ' ' : '') + text;
+  }
+  return cleanOcrLine(out);
+}
+
+function getOcrWords(data) {
+  const words = (data?.words || []).map(w => {
+    const b = w.bbox || w;
+    const x0 = Number(b.x0 ?? b.left);
+    const y0 = Number(b.y0 ?? b.top);
+    const x1 = Number(b.x1 ?? (b.left + b.width));
+    const y1 = Number(b.y1 ?? (b.top + b.height));
+    const text = cleanOcrLine(w.text || '');
+    return { text, x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0, confidence: w.confidence ?? 100 };
+  }).filter(w =>
+    w.text &&
+    w.w > 1 &&
+    w.h > 1 &&
+    Number.isFinite(w.cx) &&
+    Number.isFinite(w.cy) &&
+    !/^[\W_]+$/.test(w.text)
+  );
+  return words;
+}
+
+function groupWordsIntoTextLines(words) {
+  const lineGap = Math.max(10, median(words.map(w => w.h), 14) * 0.75);
+  const rows = [];
+  for (const word of [...words].sort((a, b) => a.cy - b.cy)) {
+    let row = rows.find(r => Math.abs(r.cy - word.cy) <= lineGap);
+    if (!row) {
+      row = { cy: word.cy, words: [] };
+      rows.push(row);
+    }
+    row.words.push(word);
+    row.cy = (row.cy * (row.words.length - 1) + word.cy) / row.words.length;
+  }
+  rows.forEach(row => row.words.sort((a, b) => a.x0 - b.x0));
+  return rows.sort((a, b) => a.cy - b.cy);
+}
+
+function splitTextLinesIntoNodeBoxes(words) {
+  const rows = groupWordsIntoTextLines(words);
+  const typicalH = median(words.map(w => w.h), 16);
+  const boxes = [];
+
+  for (const row of rows) {
+    const sorted = row.words;
+    if (!sorted.length) continue;
+    const gaps = [];
+    for (let i = 1; i < sorted.length; i++) gaps.push(sorted[i].x0 - sorted[i - 1].x1);
+    const splitGap = Math.max(18, typicalH * 1.1, median(gaps.filter(g => g > 2), 12) * 2.2);
+    let segment = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+      const gap = sorted[i].x0 - sorted[i - 1].x1;
+      if (gap > splitGap) {
+        boxes.push(makeBoxFromWords(segment));
+        segment = [];
+      }
+      segment.push(sorted[i]);
+    }
+    boxes.push(makeBoxFromWords(segment));
+  }
+
+  return mergeWrappedBoxLines(boxes.filter(b => b.text));
+}
+
+function makeBoxFromWords(words) {
+  return {
+    text: joinOcrWords(words),
+    x0: Math.min(...words.map(w => w.x0)),
+    y0: Math.min(...words.map(w => w.y0)),
+    x1: Math.max(...words.map(w => w.x1)),
+    y1: Math.max(...words.map(w => w.y1)),
+    words
+  };
+}
+
+function mergeWrappedBoxLines(boxes) {
+  const typicalH = median(boxes.map(b => b.y1 - b.y0), 20);
+  const merged = [];
+  for (const box of [...boxes].sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0)) {
+    const candidate = merged.find(prev => {
+      const verticalGap = box.y0 - prev.y1;
+      const overlap = overlapAmount(prev.x0, prev.x1, box.x0, box.x1);
+      const minW = Math.max(1, Math.min(prev.x1 - prev.x0, box.x1 - box.x0));
+      const centerNear = Math.abs(((prev.x0 + prev.x1) / 2) - ((box.x0 + box.x1) / 2)) <= Math.max(prev.x1 - prev.x0, box.x1 - box.x0) * 0.45;
+      return verticalGap >= -typicalH * 0.25 && verticalGap <= typicalH * 1.8 && (overlap / minW > 0.35 || centerNear);
+    });
+    if (candidate) {
+      candidate.text = cleanOcrLine(candidate.text + ' ' + box.text);
+      candidate.x0 = Math.min(candidate.x0, box.x0);
+      candidate.y0 = Math.min(candidate.y0, box.y0);
+      candidate.x1 = Math.max(candidate.x1, box.x1);
+      candidate.y1 = Math.max(candidate.y1, box.y1);
+      candidate.words.push(...box.words);
+    } else {
+      merged.push({ ...box, words: [...(box.words || [])] });
+    }
+  }
+  return merged;
+}
+
+function buildTreeFromPositionedBoxes(boxes) {
+  const cleanBoxes = boxes
+    .map(b => ({ ...b, text: cleanOcrLine(b.text), cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2 }))
+    .filter(b => b.text && b.text.length >= 2)
+    .sort((a, b) => a.cy - b.cy || a.cx - b.cx);
+  if (!cleanBoxes.length) throw new Error('没有识别到可导入的部门节点');
+
+  const typicalH = median(cleanBoxes.map(b => b.y1 - b.y0), 36);
+  const levelGap = Math.max(36, typicalH * 1.35);
+  const levels = [];
+  for (const box of cleanBoxes) {
+    let level = levels.find(l => Math.abs(l.cy - box.cy) <= levelGap);
+    if (!level) {
+      level = { cy: box.cy, boxes: [] };
+      levels.push(level);
+    }
+    level.boxes.push(box);
+    level.cy = (level.cy * (level.boxes.length - 1) + box.cy) / level.boxes.length;
+  }
+  levels.sort((a, b) => a.cy - b.cy);
+  levels.forEach(level => level.boxes.sort((a, b) => a.cx - b.cx));
+
+  let root;
+  const nodeByBox = new Map();
+  if (levels[0].boxes.length === 1) {
+    root = createOcrNode(levels[0].boxes[0].text);
+    nodeByBox.set(levels[0].boxes[0], root);
+  } else {
+    root = createOcrNode('导入组织架构');
+    for (const box of levels[0].boxes) {
+      const node = createOcrNode(box.text);
+      root.children.push(node);
+      nodeByBox.set(box, node);
+    }
+  }
+
+  for (let levelIndex = 1; levelIndex < levels.length; levelIndex++) {
+    const upperBoxes = levels.slice(0, levelIndex).flatMap(l => l.boxes).filter(b => nodeByBox.has(b));
+    for (const box of levels[levelIndex].boxes) {
+      const node = createOcrNode(box.text);
+      const parentBox = upperBoxes
+        .map(parent => {
+          const overlap = overlapAmount(parent.x0 - 60, parent.x1 + 60, box.x0, box.x1);
+          const dx = Math.abs(parent.cx - box.cx);
+          const dy = Math.max(1, box.cy - parent.cy);
+          return { parent, score: dy + dx * 0.35 - overlap * 0.9 };
+        })
+        .sort((a, b) => a.score - b.score)[0]?.parent;
+      (parentBox ? nodeByBox.get(parentBox) : root).children.push(node);
+      nodeByBox.set(box, node);
+    }
+  }
+
+  return root;
+}
+
+function treeToIndentedText(node, depth = 0) {
+  const line = '  '.repeat(depth) + node.name;
+  const children = (node.children || []).map(child => treeToIndentedText(child, depth + 1));
+  return [line, ...children].join('\n');
+}
+
+function parseOcrTextToOrg(text) {
+  const rawLines = text.split(/\r?\n/).map(l => l.replace(/\t/g, '    ')).filter(l => l.trim());
+  if (rawLines.length === 0) throw new Error('没有识别到可导入的文字');
+
+  const pathLines = rawLines
+    .map(l => l.replace(/[＞→]/g, '>').split('>').map(cleanOcrLine).filter(Boolean))
+    .filter(parts => parts.length > 1);
+  if (pathLines.length > 0) {
+    const root = createOcrNode(pathLines[0][0]);
+    for (const parts of pathLines) {
+      let cursor = root;
+      for (const part of parts.slice(1)) {
+        let child = cursor.children.find(c => c.name === part);
+        if (!child) {
+          child = createOcrNode(part);
+          cursor.children.push(child);
+        }
+        cursor = child;
+      }
+    }
+    return root;
+  }
+
+  const lines = rawLines.map(line => {
+    const leading = (line.match(/^\s*/) || [''])[0].length;
+    return { level: Math.floor(leading / 2), name: cleanOcrLine(line) };
+  }).filter(item => item.name.length > 0);
+
+  if (lines.length === 0) throw new Error('没有识别到可导入的部门名称');
+  if (lines.every(item => item.level === lines[0].level)) {
+    const root = createOcrNode(lines[0].name);
+    root.children = lines.slice(1).map(item => createOcrNode(item.name));
+    return root;
+  }
+
+  const minLevel = Math.min(...lines.map(item => item.level));
+  const root = createOcrNode(lines[0].name);
+  const stack = [{ level: minLevel, node: root }];
+  for (const item of lines.slice(1)) {
+    const node = createOcrNode(item.name);
+    while (stack.length > 1 && stack[stack.length - 1].level >= item.level) stack.pop();
+    const parent = stack[stack.length - 1].node;
+    parent.children.push(node);
+    stack.push({ level: item.level, node });
+  }
+  return root;
+}
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('图片读取失败'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function detectNodeBoxesFromImage(file) {
+  const img = await loadImage(file);
+  const maxSide = 1500;
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.max(1, Math.round(img.naturalWidth * scale));
+  const h = Math.max(1, Math.round(img.naturalHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, w, h);
+  URL.revokeObjectURL(img.src);
+
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const mask = new Uint8Array(w * h);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const sat = max - min;
+    const looksFilled = a > 120 && max > 30 && max < 225 && sat > 24 && !(r > 235 && g > 235 && b > 235);
+    mask[p] = looksFilled ? 1 : 0;
+  }
+
+  const visited = new Uint8Array(w * h);
+  const boxes = [];
+  const queue = [];
+  for (let p = 0; p < mask.length; p++) {
+    if (!mask[p] || visited[p]) continue;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, area = 0;
+    queue.length = 0;
+    queue.push(p);
+    visited[p] = 1;
+    for (let qi = 0; qi < queue.length; qi++) {
+      const cur = queue[qi];
+      const x = cur % w;
+      const y = Math.floor(cur / w);
+      area++;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      const neighbors = [cur - 1, cur + 1, cur - w, cur + w];
+      for (const next of neighbors) {
+        if (next < 0 || next >= mask.length || visited[next] || !mask[next]) continue;
+        if ((next === cur - 1 && x === 0) || (next === cur + 1 && x === w - 1)) continue;
+        visited[next] = 1;
+        queue.push(next);
+      }
+    }
+    const bw = maxX - minX + 1;
+    const bh = maxY - minY + 1;
+    const fill = area / Math.max(1, bw * bh);
+    if (bw >= 42 && bh >= 20 && bw <= w * 0.92 && bh <= h * 0.35 && fill > 0.28) {
+      boxes.push({
+        x0: minX / scale,
+        y0: minY / scale,
+        x1: (maxX + 1) / scale,
+        y1: (maxY + 1) / scale
+      });
+    }
+  }
+  return boxes.sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0);
+}
+
+function boxesFromDetectedNodes(detectedBoxes, words) {
+  const out = [];
+  for (const box of detectedBoxes) {
+    const margin = 8;
+    const inside = words.filter(w =>
+      w.cx >= box.x0 - margin &&
+      w.cx <= box.x1 + margin &&
+      w.cy >= box.y0 - margin &&
+      w.cy <= box.y1 + margin
+    );
+    if (!inside.length) continue;
+
+    const rowGroups = splitTextLinesIntoNodeBoxes(inside);
+    const boxWidth = box.x1 - box.x0;
+    const typicalWordWidth = median(inside.map(w => w.w), 32);
+    const shouldSplitLargeBox = rowGroups.length > 1 && boxWidth > Math.max(220, typicalWordWidth * 7);
+
+    if (shouldSplitLargeBox) {
+      for (const group of rowGroups) out.push(group);
+    } else {
+      out.push({ ...box, text: joinOcrWords(groupWordsIntoTextLines(inside).flatMap(row => row.words)), words: inside });
+    }
+  }
+  return mergeNearDuplicateBoxes(out).filter(box => box.text && box.words.length > 0);
+}
+
+function mergeNearDuplicateBoxes(boxes) {
+  const merged = [];
+  for (const box of boxes.sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0)) {
+    const duplicate = merged.find(prev => {
+      const xOverlap = overlapAmount(prev.x0, prev.x1, box.x0, box.x1);
+      const yOverlap = overlapAmount(prev.y0, prev.y1, box.y0, box.y1);
+      const minArea = Math.max(1, Math.min((prev.x1 - prev.x0) * (prev.y1 - prev.y0), (box.x1 - box.x0) * (box.y1 - box.y0)));
+      return (xOverlap * yOverlap) / minArea > 0.75;
+    });
+    if (duplicate) {
+      if ((box.text || '').length > (duplicate.text || '').length) {
+        duplicate.text = box.text;
+        duplicate.words = box.words || duplicate.words;
+      }
+      duplicate.x0 = Math.min(duplicate.x0, box.x0);
+      duplicate.y0 = Math.min(duplicate.y0, box.y0);
+      duplicate.x1 = Math.max(duplicate.x1, box.x1);
+      duplicate.y1 = Math.max(duplicate.y1, box.y1);
+    } else {
+      merged.push({ ...box });
+    }
+  }
+  return merged;
+}
+
+async function buildTreeFromOcrResult(file, resultData) {
+  const words = getOcrWords(resultData);
+  if (!words.length) throw new Error('OCR 没有返回可用文字');
+
+  try {
+    const detectedBoxes = await detectNodeBoxesFromImage(file);
+    const positioned = boxesFromDetectedNodes(detectedBoxes, words);
+    if (positioned.length >= 2) return buildTreeFromPositionedBoxes(positioned);
+  } catch (err) {
+    console.warn('节点框检测失败，改用文字坐标解析：', err);
+  }
+
+  return buildTreeFromPositionedBoxes(splitTextLinesIntoNodeBoxes(words));
+}
+
+function openOcrModal(text = '') {
+  document.getElementById('ocrText').value = text;
+  document.getElementById('ocrModalOverlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('ocrText').focus(), 30);
+}
+
+function closeOcrModal() {
+  document.getElementById('ocrModalOverlay').style.display = 'none';
+}
+
+async function importImageFile(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  ocrParsedTree = null;
+  ocrPreviewText = '';
+  if (!file) return;
+  if (!window.Tesseract) {
+    showToast('OCR 引擎未加载，请确认网络后刷新页面', 'error');
+    return;
+  }
+  openOcrModal('');
+  const progress = document.getElementById('ocrProgress');
+  progress.textContent = '正在识别图片文字和节点位置...';
+  try {
+    const result = await Tesseract.recognize(file, 'chi_sim+eng', {
+      logger: m => {
+        if (m.status && m.progress != null) {
+          progress.textContent = `${m.status} ${Math.round(m.progress * 100)}%`;
+        }
+      }
+    });
+    ocrParsedTree = normalizeImportedData(await buildTreeFromOcrResult(file, result.data));
+    ocrPreviewText = treeToIndentedText(ocrParsedTree);
+    document.getElementById('ocrText').value = ocrPreviewText;
+    progress.textContent = '识别完成，已按图片节点位置生成层级预览，可修正后导入';
+    showToast('图片识别完成', 'success');
+  } catch (err) {
+    document.getElementById('ocrText').value = '';
+    progress.textContent = '识别失败';
+    showToast('图片识别失败：' + err.message, 'error');
+  }
+}
+
+function applyOcrImport() {
+  const text = document.getElementById('ocrText').value.trim();
+  if (!text) {
+    showToast('请先识别或粘贴部门文字', 'error');
+    return;
+  }
+  try {
+    const shouldUseGeneratedTree = ocrParsedTree && text === ocrPreviewText;
+    const parsed = normalizeImportedData(shouldUseGeneratedTree ? cloneData(ocrParsedTree) : parseOcrTextToOrg(text));
+    pushUndo();
+    orgData = parsed;
+    refreshIdCounter(orgData);
+    selectedNodeId = null;
+    closeOcrModal();
+    render();
+    setTimeout(fitToScreen, 100);
+    showToast('已从图片识别导入组织架构', 'success');
+  } catch (err) {
+    showToast('导入失败：' + err.message, 'error');
+  }
+}
+
+
+                // ============ IMPORT / EXPORT ============
     function exportJSON() {
       const data = cloneData(orgData);
       // Clean up layout properties
       function cleanData(n) {
-        delete n._x; delete n._y; delete n._depth;
+        delete n._x; delete n._y; delete n._depth; delete n._layout;
         for (const child of n.children || []) cleanData(child);
       }
       cleanData(data);
@@ -1566,6 +2460,7 @@
           if (!data.id || !data.name) {
             throw new Error('无效的组织架构数据');
           }
+          pushUndo();
           orgData = data;
           // Update id counter
           let maxId = 0;
@@ -1902,10 +2797,17 @@
     }
 
     function changeLayout(layout) {
-      currentLayout = layout;
+      // Apply layout to all nodes recursively
+      function setLayout(node) {
+        node._layout = layout;
+        for (const child of node.children || []) setLayout(child);
+      }
+      setLayout(orgData);
       selectedNodeId = null;
       render();
-      showToast('已切换为' + (layout === 'tree' ? '树形' : '左展开') + '布局', 'success');
+      setTimeout(fitToScreen, 100);
+      const names = { tree: '全部树形', left: '全部左展', right: '全部右展' };
+      showToast('已切换为' + (names[layout] || layout), 'success');
     }
 
     // ============ MOUSE EVENTS ============
@@ -1927,6 +2829,20 @@
     });
 
     window.addEventListener('mousemove', (e) => {
+      // Node drag-to-move (locked to same depth line, horizontal only)
+      if (isDraggingNode && selectedNodeId) {
+        const node = findNode(orgData, selectedNodeId);
+        if (node) {
+          const dx = (e.clientX - dragStartX) / zoomLevel;
+          // Apply offset to the dragged node and all its descendants
+          const currentX = nodeStartX + dx;
+          const deltaX = currentX - (node._offsetX || 0);
+          shiftOffsets(node, deltaX);
+          render();
+        }
+        return;
+      }
+      // Canvas pan
       if (!isPanning) return;
       panX = startPanX + (e.clientX - startMouseX);
       panY = startPanY + (e.clientY - startMouseY);
@@ -1934,6 +2850,14 @@
     });
 
     window.addEventListener('mouseup', () => {
+      if (isDraggingNode) {
+        isDraggingNode = false;
+        // Restore cursor
+        if (selectedNodeId && nodeElements.has(selectedNodeId)) {
+          nodeElements.get(selectedNodeId).style.cursor = '';
+        }
+        return;
+      }
       isPanning = false;
       canvasContainer.classList.remove('dragging');
     });
@@ -1976,6 +2900,20 @@
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       
       switch (e.key) {
+        case 'z':
+        case 'Z':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            if (e.shiftKey) redo(); else undo();
+          }
+          break;
+        case 'y':
+        case 'Y':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            redo();
+          }
+          break;
         case 'Delete':
         case 'Backspace':
           if (selectedNodeId) deleteNodeById(selectedNodeId);
